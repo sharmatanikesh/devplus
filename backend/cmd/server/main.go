@@ -28,9 +28,6 @@ func main() {
 	// Initialize Router
 	r := router.SetupRouter()
 
-	// Setup Routes - handled inside SetupRouter now
-	// router.SetupRoutes(r)
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

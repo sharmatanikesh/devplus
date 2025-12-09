@@ -29,7 +29,11 @@ func GetInstance() *gorm.DB {
 			cfg.DBName,
 			cfg.DBPort,
 		)
-		log.Info().Msg("DATABASE CONNECTION STRING: " + dsn)
+		log.Info().
+			Str("host", cfg.DBHost).
+			Str("dbname", cfg.DBName).
+			Str("port", cfg.DBPort).
+			Msg("Connecting to database")
 
 		db, err := gorm.Open(postgres.New(postgres.Config{
 			DSN:                  dsn,
@@ -53,7 +57,7 @@ func Close() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Closing database connection...")
+		log.Info().Msg("Closing database connection...")
 		return db.Close()
 	}
 	return nil
