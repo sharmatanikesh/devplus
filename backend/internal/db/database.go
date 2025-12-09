@@ -2,23 +2,25 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"devplus-backend/internal/config"
-	"devplus-backend/internal/models"
 
+	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var (
-	DB   *gorm.DB
-	once sync.Once
+	instance *gorm.DB
+	once     sync.Once
 )
 
-func InitDB(cfg *config.Config) {
+func GetInstance() *gorm.DB {
 	once.Do(func() {
+		log.Info().Msg("Establishing database connection...")
+
+		cfg := config.LoadConfig()
 		dsn := fmt.Sprintf(
 			"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 			cfg.DBHost,
@@ -27,26 +29,46 @@ func InitDB(cfg *config.Config) {
 			cfg.DBName,
 			cfg.DBPort,
 		)
+		log.Info().Msg("DATABASE CONNECTION STRING: " + dsn)
 
-		var err error
-		DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		db, err := gorm.Open(postgres.New(postgres.Config{
+			DSN:                  dsn,
+			PreferSimpleProtocol: true,
+		}), &gorm.Config{})
 		if err != nil {
-			log.Fatal("Failed to connect to database:", err)
+			log.Fatal().Err(err).Msg("Failed to connect to database")
 		}
 
-		log.Println("Database connection established")
-
-		// Auto-migrate models
-		err = DB.AutoMigrate(
-			&models.User{},
-			&models.Repository{},
-			&models.PullRequest{},
-			&models.Commit{},
-			&models.Metric{},
-		)
-		if err != nil {
-			log.Fatal("Failed to migrate database:", err)
-		}
-		log.Println("Database migration completed")
+		instance = db
+		log.Info().Msg("Database connection established successfully")
 	})
+
+	return instance
+}
+
+// Close closes the database connection
+func Close() error {
+	if instance != nil {
+		db, err := instance.DB()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Closing database connection...")
+		return db.Close()
+	}
+	return nil
+}
+
+// IsConnected checks if the database connection is alive
+func IsConnected() bool {
+	if instance == nil {
+		return false
+	}
+
+	sqlDB, err := instance.DB()
+	if err != nil {
+		return false
+	}
+
+	return sqlDB.Ping() == nil
 }

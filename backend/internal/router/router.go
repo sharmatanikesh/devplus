@@ -1,35 +1,34 @@
 package router
 
 import (
-	"devplus-backend/internal/controllers"
+	"encoding/json"
+	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(r *gin.Engine) {
-	// Initialize Controllers
-	webhookCtrl := controllers.NewWebhookController()
-	repoCtrl := controllers.NewRepoController()
-	actionCtrl := controllers.NewActionController()
-	metricCtrl := controllers.NewMetricController()
+// SetupRouter configures all HTTP routes for the application.
+func SetupRouter() *mux.Router {
+	router := mux.NewRouter()
 
-	api := r.Group("/api/v1")
-	{
-		// Webhooks
-		api.POST("/webhook/github", webhookCtrl.HandleWebhook)
+	// Global OPTIONS handler for CORS preflight requests (initially open)
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.NotFound(w, r)
+	}).Methods("OPTIONS")
 
-		// Repos
-		api.GET("/repos", repoCtrl.ListRepos)
-		api.POST("/repos/:id/sync", repoCtrl.SyncRepo)
-		api.GET("/repos/:id/prs", repoCtrl.ListPRs)
-		api.GET("/repos/:id/prs/:pr_number", repoCtrl.GetPR)
+	// Health check endpoint
+	router.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "ok",
+			"message": "Server is running",
+		})
+	}).Methods("GET")
 
-		// Actions
-		api.POST("/repos/:id/prs/:pr_number/analyze", actionCtrl.AnalyzePR)
-		api.POST("/repos/:id/release", actionCtrl.CreateRelease)
-
-		// Metrics & Impact
-		api.GET("/metrics", metricCtrl.GetMetrics)
-		api.GET("/impact/:pr_id", actionCtrl.GetImpactAnalysis)
-	}
+	return router
 }

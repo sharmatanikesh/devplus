@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"devplus-backend/internal/config"
 	"devplus-backend/internal/db"
 	"devplus-backend/internal/router"
 	"devplus-backend/pkg/logger"
 
-	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,32 +19,64 @@ func main() {
 	// Initialize Logger
 	logger.InitLogger()
 
-	// Load Configuration
-	cfg := config.LoadConfig()
+	// Initialize Logger
+	logger.InitLogger()
 
 	// Initialize Database
-	db.InitDB(cfg)
+	db.GetInstance()
 
 	// Initialize Router
-	r := gin.Default()
+	r := router.SetupRouter()
 
-	// Health Check
-	r.GET("/api/v1/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
-
-	// Setup Routes
-	router.SetupRoutes(r)
+	// Setup Routes - handled inside SetupRouter now
+	// router.SetupRoutes(r)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Info().Msgf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatal().Err(err).Msg("Failed to start server")
+	addr := ":" + port
+	server := &http.Server{
+		Addr:    addr,
+		Handler: r,
 	}
+
+	log.Info().Str("address", addr).Msg("Server starting")
+
+	// Channel to listen for interrupt signals
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("Failed to start server")
+		}
+	}()
+
+	log.Info().Msg("Server started successfully")
+
+	// Wait for interrupt signal
+	<-done
+
+	log.Info().Msg("Shutting down server...")
+
+	// Graceful shutdown with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to shutdown server gracefully")
+		return
+	}
+
+	// Close database connection
+	if err := db.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close database connection")
+	} else {
+		log.Info().Msg("Database connection closed successfully")
+	}
+
+	log.Info().Msg("Server shutdown successfully")
 }
