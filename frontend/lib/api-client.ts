@@ -42,11 +42,36 @@ class ApiClient {
         };
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        data,
-      };
+      // Handle empty responses (204 No Content, etc.)
+      const contentType = response.headers.get('Content-Type');
+      const contentLength = response.headers.get('Content-Length');
+      
+      // Check if response is empty
+      if (
+        response.status === 204 || 
+        contentLength === '0' || 
+        (!contentType?.includes('application/json') && !contentType?.includes('text/json'))
+      ) {
+        return {
+          success: true,
+          data: null as T,
+        };
+      }
+
+      // Try to parse JSON, fallback to null if parsing fails
+      try {
+        const data = await response.json();
+        return {
+          success: true,
+          data,
+        };
+      } catch (parseError) {
+        console.warn('Failed to parse JSON response:', parseError);
+        return {
+          success: true,
+          data: null as T,
+        };
+      }
     } catch (error) {
       return {
         success: false,

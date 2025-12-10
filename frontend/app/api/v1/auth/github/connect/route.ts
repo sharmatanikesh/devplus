@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Validate required environment variables at module load
+const NEXTAUTH_URL = process.env.NEXTAUTH_URL;
+if (!NEXTAUTH_URL) {
+  throw new Error('NEXTAUTH_URL environment variable is required but not set');
+}
+
 /**
  * GET /api/v1/auth/github/connect
  * Initiates GitHub OAuth flow
@@ -7,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     const clientId = process.env.GITHUB_CLIENT_ID;
-    const redirectUri = process.env.GITHUB_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/v1/auth/github/callback`;
+    const redirectUri = process.env.GITHUB_REDIRECT_URI || `${NEXTAUTH_URL}/api/v1/auth/github/callback`;
     
     if (!clientId) {
       return NextResponse.json(
@@ -15,7 +21,7 @@ export async function GET(request: NextRequest) {
           success: false, 
           error: { 
             code: 'MISSING_CONFIG', 
-            message: 'GitHub OAuth not configured' 
+            message: 'GitHub OAuth not configured. Please set GITHUB_CLIENT_ID environment variable.' 
           } 
         },
         { status: 500 }
@@ -44,3 +50,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
