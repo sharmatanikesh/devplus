@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +27,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { NAVIGATION_ITEMS } from '@/lib/constants';
+import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 const iconMap = {
   LayoutDashboard,
@@ -42,7 +44,32 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Get initial session
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    
+    getUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -118,13 +145,18 @@ export default function DashboardLayout({
                   className="w-full justify-start px-3 h-auto py-2"
                 >
                   <Avatar className="h-8 w-8 mr-3">
-                    <AvatarImage src="https://github.com/github.png" />
-                    <AvatarFallback>DV</AvatarFallback>
+                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarFallback>
+                      {user?.user_metadata?.user_name?.[0]?.toUpperCase() || 
+                       user?.email?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium">Developer</span>
+                    <span className="text-sm font-medium">
+                      {user?.user_metadata?.user_name || user?.email?.split('@')[0] || 'User'}
+                    </span>
                     <span className="text-xs text-muted-foreground">
-                      developer@example.com
+                      {user?.email || 'Loading...'}
                     </span>
                   </div>
                 </Button>
@@ -137,7 +169,7 @@ export default function DashboardLayout({
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600">
+                <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>

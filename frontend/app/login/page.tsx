@@ -1,18 +1,42 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Github, Zap, BarChart3, GitPullRequest, Package } from 'lucide-react';
+import { Github, Zap, BarChart3, GitPullRequest, Package, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const error = searchParams.get('error');
+  const next = searchParams.get('next');
 
   const handleGithubLogin = async () => {
     setIsLoading(true);
     try {
-      // Redirect to GitHub OAuth
-      window.location.href = '/api/v1/auth/github/connect';
+      const supabase = createClient();
+      
+      // Construct the callback URL with next parameter if exists
+      const redirectTo = next 
+        ? `${window.location.origin}/api/v1/auth/callback?next=${encodeURIComponent(next)}`
+        : `${window.location.origin}/api/v1/auth/callback`;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (error) {
+        console.error('Login error:', error);
+        setIsLoading(false);
+      }
+      // Note: If successful, the browser will redirect to GitHub OAuth page
+      // The user will be redirected back to /api/v1/auth/callback after authorization
     } catch (error) {
       console.error('Login error:', error);
       setIsLoading(false);
@@ -69,6 +93,26 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Error message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-900">Authentication failed</p>
+                  <p className="text-sm text-red-700 mt-1">
+                    Please try again or contact support if the issue persists.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Redirect notice */}
+            {next && (
+              <Badge variant="outline" className="w-full justify-center py-2">
+                You&apos;ll be redirected after login
+              </Badge>
+            )}
+            
             <Button
               className="w-full h-12 text-base"
               size="lg"
