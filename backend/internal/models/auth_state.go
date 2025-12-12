@@ -1,0 +1,14 @@
+package models
+
+import "time"
+
+type AuthState struct {
+	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	State     string    `gorm:"uniqueIndex;not null" json:"state"`
+	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (AuthState) TableName() string {
+	return "auth_states"
+}
