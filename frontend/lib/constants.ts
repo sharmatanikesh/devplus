@@ -1,5 +1,6 @@
 // API Configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+// API Configuration
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // App Metadata
@@ -9,31 +10,31 @@ export const APP_DESCRIPTION = 'AI-powered PR review and engineering metrics pla
 // API Endpoints
 export const API_ENDPOINTS = {
   // Auth
-  AUTH_GITHUB_CONNECT: '/auth/github/connect',
-  AUTH_GITHUB_CALLBACK: '/auth/github/callback',
-  
+  AUTH_GITHUB_CONNECT: '/v1/auth/github/login',
+  AUTH_GITHUB_CALLBACK: '/v1/auth/github/callback',
+
   // Repos
-  REPOS_LIST: '/repos',
-  REPOS_DETAIL: (id: string) => `/repos/${id}`,
-  REPOS_SYNC: (id: string) => `/repos/${id}/sync`,
-  REPOS_PRS: (id: string) => `/repos/${id}/prs`,
-  
+  REPOS_LIST: '/v1/repos',
+  REPOS_DETAIL: (id: string) => `/v1/repos/${id}`,
+  REPOS_SYNC: (id: string) => `/v1/repos/${id}/sync`,
+  REPOS_PRS: (id: string) => `/v1/repos/${id}/prs`,
+
   // PRs
-  PR_DETAIL: (repoId: string, prNumber: number) => `/repos/${repoId}/prs/${prNumber}`,
-  PR_ANALYZE: (repoId: string, prNumber: number) => `/repos/${repoId}/prs/${prNumber}/analyze`,
-  
+  PR_DETAIL: (repoId: string, prNumber: number) => `/v1/repos/${repoId}/prs/${prNumber}`,
+  PR_ANALYZE: (repoId: string, prNumber: number) => `/v1/repos/${repoId}/prs/${prNumber}/analyze`,
+
   // Release
-  RELEASE_CREATE: (repoId: string) => `/repos/${repoId}/release`,
-  
+  RELEASE_CREATE: (repoId: string) => `/v1/repos/${repoId}/release`,
+
   // Metrics & Impact
-  METRICS: '/metrics',
-  IMPACT: (prId: string) => `/impact/${prId}`,
-  
+  METRICS: '/v1/metrics',
+  IMPACT: (prId: string) => `/v1/impact/${prId}`,
+
   // Webhook
-  WEBHOOK_GITHUB: '/webhook/github',
-  
+  WEBHOOK_GITHUB: '/v1/webhook/github',
+
   // System
-  HEALTH: '/health',
+  HEALTH: '/v1/health',
 } as const;
 
 // Dashboard Navigation

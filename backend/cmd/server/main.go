@@ -8,8 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"devplus-backend/internal/controllers/rest"
 	"devplus-backend/internal/db"
 	"devplus-backend/internal/router"
+	"devplus-backend/internal/services/auth_service"
+	"devplus-backend/internal/services/github_service"
 	"devplus-backend/pkg/logger"
 
 	"github.com/rs/zerolog/log"
@@ -19,14 +22,21 @@ func main() {
 	// Initialize Logger
 	logger.InitLogger()
 
-	// Initialize Logger
-	logger.InitLogger()
-
 	// Initialize Database
-	db.GetInstance()
+	database := db.GetInstance()
+
+	// Initialize Services
+	authService := auth_service.NewAuthService()
+	githubService := github_service.NewGithubService(database)
+
+	// Initialize Controllers
+	authController := rest.NewAuthController(authService)
+	githubController := rest.NewGithubController(githubService)
 
 	// Initialize Router
-	r := router.SetupRouter()
+	r := router.SetupRouter(authController, githubController)
+
+	// Let's remove the redundancy.
 
 	port := os.Getenv("PORT")
 	if port == "" {
