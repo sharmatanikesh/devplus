@@ -137,7 +137,7 @@ func (s *AuthService) HandleCallback(code, state string) (*models.Session, error
 	// 6. Create Session
 	session := models.Session{
 		ID:        uuid.New().String(),
-		UserID:    user.ID,
+		UserID:    user.ID,                        // now string
 		ExpiresAt: time.Now().Add(24 * time.Hour), // 1 day session
 	}
 

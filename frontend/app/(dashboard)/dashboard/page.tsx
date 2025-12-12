@@ -1,10 +1,52 @@
 'use client';
+// Force HMR Update
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { GitPullRequest, Package, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+  const [recentPRs, setRecentPRs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Verify session by fetching a protected resource
+    const checkAuthAndFetch = async () => {
+      try {
+        const [statsRes, activeRes] = await Promise.all([
+          apiClient.dashboard.stats(),
+          apiClient.dashboard.recentActivity()
+        ]);
+
+        if (!statsRes.success && statsRes.error?.code === 'HTTP_401') {
+          router.push('/login');
+          return;
+        }
+
+        if (statsRes.success) {
+          setStats(statsRes.data);
+        }
+        if (activeRes.success) {
+          setRecentPRs(activeRes.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAuthAndFetch();
+  }, [router]);
+
+  if (loading) {
+    return <div>Loading...</div>; // TODO: Add better skeleton
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -18,32 +60,28 @@ export default function DashboardPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Open PRs"
-          value="12"
-          description="+2 from last week"
+          title="Total PRs"
+          value={stats?.total_prs?.toString() || "0"}
+          description="All time"
           icon={<GitPullRequest className="h-4 w-4 text-muted-foreground" />}
-          trend="up"
         />
         <StatsCard
-          title="Avg Review Time"
-          value="4.2h"
-          description="-8% from last week"
+          title="Open PRs"
+          value={stats?.open_prs?.toString() || "0"}
+          description="Currently active"
           icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-          trend="down"
-          trendPositive
         />
         <StatsCard
-          title="Merge Rate"
-          value="85.5%"
-          description="+3.2% from last week"
+          title="Merged PRs"
+          value={stats?.merged_prs?.toString() || "0"}
+          description="Successfully merged"
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-          trend="up"
           trendPositive
         />
         <StatsCard
           title="Active Repos"
-          value="8"
-          description="2 syncing now"
+          value={stats?.active_repos?.toString() || "0"}
+          description="Tracked repositories"
           icon={<Package className="h-4 w-4 text-muted-foreground" />}
         />
       </div>
@@ -56,27 +94,20 @@ export default function DashboardPage() {
             <CardDescription>Latest PR reviews and activity</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <PRItem
-              number={42}
-              title="Add new feature: AI-powered code review"
-              repo="devpulse-frontend"
-              status="approved"
-              time="2 hours ago"
-            />
-            <PRItem
-              number={41}
-              title="Fix: Update authentication flow"
-              repo="devpulse-backend"
-              status="pending"
-              time="5 hours ago"
-            />
-            <PRItem
-              number={40}
-              title="Refactor: Improve metrics calculation"
-              repo="devpulse-backend"
-              status="changes_requested"
-              time="1 day ago"
-            />
+            {recentPRs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent pull requests found.</p>
+            ) : (
+              recentPRs.map((pr) => (
+                <PRItem
+                  key={pr.id}
+                  number={pr.number}
+                  title={pr.title || "Untitled"}
+                  repo={pr.repository?.name || "Unknown Repo"}
+                  status={pr.state === 'open' ? 'pending' : (pr.state === 'closed' ? 'approved' : 'changes_requested')} // Mapping github state to UI
+                  time={new Date(pr.created_at).toLocaleDateString()}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
 

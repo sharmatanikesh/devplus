@@ -5,7 +5,7 @@ import (
 )
 
 type PullRequest struct {
-	ID         int64       `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ID         string      `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt  *time.Time  `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt  *time.Time  `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt  *time.Time  `gorm:"column:deleted_at;index:idx_pull_requests_deleted_at" json:"deleted_at"`
@@ -13,7 +13,7 @@ type PullRequest struct {
 	Number     *int64      `gorm:"column:number" json:"number"`
 	Title      *string     `gorm:"column:title" json:"title"`
 	State      *string     `gorm:"column:state" json:"state"`
-	RepoID     *int64      `gorm:"column:repo_id" json:"repo_id"`
+	RepoID     *string     `gorm:"column:repo_id" json:"repo_id"`
 	Repository *Repository `gorm:"foreignKey:RepoID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"repository"`
 	AuthorID   *int64      `gorm:"column:author_id" json:"author_id"`
 	AuthorName *string     `gorm:"column:author_name" json:"author_name"`

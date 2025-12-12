@@ -5,7 +5,7 @@ import (
 )
 
 type User struct {
-	ID           int64      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ID           string     `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt    time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 	DeletedAt    *time.Time `gorm:"column:deleted_at;index:idx_users_deleted_at" json:"deleted_at"`

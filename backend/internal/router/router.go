@@ -8,20 +8,14 @@ import (
 
 	"devplus-backend/internal/controllers/rest"
 	"devplus-backend/internal/middleware"
-	"devplus-backend/internal/services/auth_service"
-	"devplus-backend/internal/services/github_service"
 )
 
 // SetupRouter configures all HTTP routes for the application.
-func SetupRouter() *mux.Router {
+func SetupRouter(authController *rest.AuthController, githubController *rest.GithubController) *mux.Router {
 	router := mux.NewRouter()
 
-	// Initialize Services & Controllers
-	authService := auth_service.NewAuthService()
-	authController := rest.NewAuthController(authService)
-
-	githubService := github_service.NewGithubService()
-	githubController := rest.NewGithubController(githubService)
+	// Apply Middleware
+	router.Use(middleware.CORSMiddleware)
 
 	// Global OPTIONS handler
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,8 +26,11 @@ func SetupRouter() *mux.Router {
 		http.NotFound(w, r)
 	}).Methods("OPTIONS")
 
+	// API V1 Config
+	v1 := router.PathPrefix("/api/v1").Subrouter()
+
 	// Public Routes
-	router.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+	v1.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
@@ -42,22 +39,25 @@ func SetupRouter() *mux.Router {
 		})
 	}).Methods("GET")
 
-	// Auth Routes
-	router.HandleFunc("/api/auth/github/login", authController.Login).Methods("GET")
-	router.HandleFunc("/api/auth/github/callback", authController.Callback).Methods("GET")
-	router.HandleFunc("/api/auth/logout", authController.Logout).Methods("POST")
+	// Auth Routes (Nested under /auth)
+	auth := v1.PathPrefix("/auth").Subrouter()
+	auth.HandleFunc("/github/login", authController.Login).Methods("GET")
+	auth.HandleFunc("/github/callback", authController.Callback).Methods("GET")
+	auth.HandleFunc("/logout", authController.Logout).Methods("POST")
 
 	// Protected Routes (Session Based)
-	protected := router.PathPrefix("/api/v1").Subrouter()
+	// We create a new subrouter off v1 so wAdd new feature: AI-powered code reviewe can apply middleware ONLY to these routes
+	protected := v1.PathPrefix("/").Subrouter()
 	protected.Use(middleware.SessionMiddleware)
 
 	// Register existing controllers to protected routes
 	protected.HandleFunc("/repos", githubController.GetRepositories).Methods("GET")
+	protected.HandleFunc("/repos/sync", githubController.SyncRepositories).Methods("POST")
 	protected.HandleFunc("/repos/{owner}/{repo}/pulls", githubController.GetPullRequests).Methods("GET")
-	// Add other protected routes here...
+
+	// Dashboard Routes
+	protected.HandleFunc("/dashboard/stats", githubController.GetDashboardStats).Methods("GET")
+	protected.HandleFunc("/dashboard/recent-prs", githubController.GetRecentActivity).Methods("GET")
 
 	return router
 }
-
-// SetupProtectedRouter is deprecated or needs to be adapted if still used by tests/main
-// functionality moved to SetupRouter for now

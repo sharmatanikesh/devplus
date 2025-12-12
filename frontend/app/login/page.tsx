@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Github, Zap, BarChart3, GitPullRequest, Package } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -12,7 +13,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       // Redirect to GitHub OAuth
-      window.location.href = '/api/v1/auth/github/connect';
+      apiClient.auth.login();
     } catch (error) {
       console.error('Login error:', error);
       setIsLoading(false);
