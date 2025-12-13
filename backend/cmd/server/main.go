@@ -33,7 +33,7 @@ func main() {
 
 	// Initialize Services
 	// Initialize AI Factory
-	aiFactory := ai.NewAIFactory(cfg.KestraURL)
+	aiFactory := ai.NewAIFactory(cfg.KestraURL, cfg.KestraUsername, cfg.KestraPassword)
 
 	// Initialize Services
 	authService := auth_service.NewAuthService()

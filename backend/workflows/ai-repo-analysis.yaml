@@ -17,7 +17,7 @@ tasks:
     messages:
       - role: user
         content: |
-          You are a senior software architect. Analyze the repository named "{{ inputs.repo_name }}".
+          You are a senior software architect. Analyze the repository named "{{ trigger.body.repo_name ?? inputs.repo_name }}".
 
           Since I cannot provide the full codebase, please provide a generic architectural advice summary for a modern web application, assumming standard best practices.
 
@@ -29,11 +29,16 @@ tasks:
 
   - id: callback_backend
     type: io.kestra.plugin.core.http.Request
-    uri: "{{ inputs.callback_url }}"
+    uri: "{{ trigger.body.callback_url ?? inputs.callback_url }}"
     method: POST
     contentType: application/json
     body: |
       {
-        "repo_id": "{{ inputs.repo_id }}",
+        "repo_id": "{{ trigger.body.repo_id ?? inputs.repo_id }}",
         "summary": "{{ outputs.analyze_repo.result | jq('.summary') }}"
       }
+
+triggers:
+  - id: webhook
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: devplus-repo-webhook-key

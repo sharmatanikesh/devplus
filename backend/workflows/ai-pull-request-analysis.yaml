@@ -8,6 +8,10 @@ inputs:
     type: INT
   - name: repo_id
     type: STRING
+  - name: repo_owner
+    type: STRING
+  - name: repo_name
+    type: STRING
   - name: pr_title
     type: STRING
   - name: callback_url
@@ -18,8 +22,28 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     runner: PROCESS
     commands:
-      - echo "Fetching diff for Repo {{ inputs.repo_id }} PR {{ inputs.pr_id }}..."
-      # TODO: Replace with GitHub API diff fetch
+      - |
+        OWNER="{{ trigger.body.repo_owner ?? inputs.repo_owner }}"
+        REPO="{{ trigger.body.repo_name ?? inputs.repo_name }}"
+        PR_NUMBER="{{ trigger.body.pr_number ?? inputs.pr_number }}"
+
+        echo "Fetching diff for $OWNER/$REPO PR #$PR_NUMBER..."
+
+        # Fetch PR diff from GitHub API
+        DIFF=$(curl -s -L \
+          -H "Accept: application/vnd.github.v3.diff" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER")
+
+        if [ -z "$DIFF" ]; then
+          echo "Error: Failed to fetch diff"
+          exit 1
+        fi
+
+        echo "$DIFF" > /tmp/pr_diff.txt
+        echo "Diff fetched successfully ($(wc -l < /tmp/pr_diff.txt) lines)"
+    outputFiles:
+      - /tmp/pr_diff.txt
 
   - id: analyze_with_gemini
     type: io.kestra.plugin.gemini.ChatCompletion
@@ -29,22 +53,41 @@ tasks:
       - role: user
         content: |
           You are a code reviewer. Analyze the following Pull Request:
-          PR Title: {{ inputs.pr_title }}
+
+          Repository: {{ trigger.body.repo_owner ?? inputs.repo_owner }}/{{ trigger.body.repo_name ?? inputs.repo_name }}
+          PR #{{ trigger.body.pr_number ?? inputs.pr_number }}: {{ trigger.body.pr_title ?? inputs.pr_title }}
+
+          Code Changes (Diff):
+          ```diff
+          {{ outputs.fetch_diff.outputFiles['/tmp/pr_diff.txt'] }}
+          ```
+
+          Please provide a thorough code review analyzing:
+          1. Code quality and best practices
+          2. Potential bugs or issues
+          3. Security concerns
+          4. Performance implications
+          5. Overall recommendation
 
           Provide a JSON response in the format:
           {
-            "summary": "...",
+            "summary": "Detailed review summary with specific feedback",
             "decision": "APPROVE or REQUEST_CHANGES"
           }
 
   - id: callback_backend
     type: io.kestra.plugin.core.http.Request
-    uri: "{{ inputs.callback_url }}"
+    uri: "{{ trigger.body.callback_url ?? inputs.callback_url }}"
     method: POST
     contentType: application/json
     body: |
       {
-        "pr_id": "{{ inputs.pr_id }}",
+        "pr_id": "{{ trigger.body.pr_id ?? inputs.pr_id }}",
         "summary": "{{ outputs.analyze_with_gemini.result | jq('.summary') }}",
         "decision": "{{ outputs.analyze_with_gemini.result | jq('.decision') }}"
       }
+
+triggers:
+  - id: webhook
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: devplus-webhook-key

@@ -20,6 +20,8 @@ type Config struct {
 	GithubRedirectURI   string
 	FrontendURL         string
 	KestraURL           string
+	KestraUsername      string
+	KestraPassword      string
 	BackendURL          string
 }
 
@@ -41,6 +43,8 @@ func LoadConfig() *Config {
 		GithubRedirectURI:   getEnv("GITHUB_REDIRECT_URI", ""),
 		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000/dashboard"),
 		KestraURL:           getEnv("KESTRA_URL", "http://localhost:8080"),
+		KestraUsername:      getEnv("KESTRA_USERNAME", ""),
+		KestraPassword:      getEnv("KESTRA_PASSWORD", ""),
 		BackendURL:          getEnv("BACKEND_URL", "http://host.docker.internal:8080"),
 	}
 }

@@ -150,7 +150,7 @@ func (r *gormGithubRepository) GetMetrics(ctx context.Context, filter models.Met
 
 func (r *gormGithubRepository) GetPullRequest(ctx context.Context, repoID string, number int) (*models.PullRequest, error) {
 	var pr models.PullRequest
-	if err := r.db.WithContext(ctx).Where("repo_id = ? AND number = ?", repoID, number).First(&pr).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Repository").Where("repo_id = ? AND number = ?", repoID, number).First(&pr).Error; err != nil {
 		return nil, err
 	}
 	return &pr, nil

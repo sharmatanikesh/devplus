@@ -8,17 +8,23 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"devplus-backend/internal/models"
 )
 
 type KestraAIService struct {
 	kestraURL string
+	username  string
+	password  string
 	client    *http.Client
 }
 
-func NewKestraAIService(kestraURL string) *KestraAIService {
+func NewKestraAIService(kestraURL, username, password string) *KestraAIService {
 	return &KestraAIService{
 		kestraURL: kestraURL,
+		username:  username,
+		password:  password,
 		client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -31,66 +37,80 @@ type KestraExecutionRequest struct {
 }
 
 func (s *KestraAIService) AnalyzePR(ctx context.Context, pr *models.PullRequest, callbackURL string) error {
+	log.Info().Str("pr_id", pr.ID).Str("flow_id", "ai-pull-request-analysis").Msg("[KestraService] Analyzing PR")
+
+	// Ensure repository is loaded
+	if pr.Repository == nil {
+		log.Error().Str("pr_id", pr.ID).Msg("[KestraService] Repository not loaded in PR model")
+		return fmt.Errorf("repository not loaded for PR %s", pr.ID)
+	}
+
 	// Construct inputs for Kestra Flow
 	inputs := map[string]interface{}{
 		"pr_id":        pr.ID,
 		"pr_number":    pr.Number,
 		"repo_id":      pr.RepoID,
+		"repo_owner":   pr.Repository.Owner,
+		"repo_name":    pr.Repository.Name,
 		"pr_title":     pr.Title,
 		"callback_url": callbackURL,
-		// In a real scenario, we might pass the Diff content here,
-		// OR Kestra task fetches it from Github using token.
-		// For simplicity, let's assume Kestra fetches it or we pass a placeholder.
-		// "diff": "...",
 	}
 
 	reqBody := KestraExecutionRequest{
-		Namespace: "devplus", // Assuming a namespace
+		Namespace: "devplus",
 		FlowId:    "ai-pull-request-analysis",
 		Inputs:    inputs,
-		Wait:      false, // Async
+		Wait:      false,
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	// Use Webhook endpoint
+	// Format: /api/v1/executions/webhook/{namespace}/{flowId}/{key}
+	url := fmt.Sprintf("%s/api/v1/executions/webhook/%s/%s/devplus-webhook-key", s.kestraURL, reqBody.Namespace, reqBody.FlowId)
+
+	// For Webhook, we send the inputs directly as the body, not wrapped in KestraExecutionRequest
+	// So we marshal 'inputs' directly
+	jsonBody, err := json.Marshal(inputs)
+
 	if err != nil {
+		log.Error().Err(err).Msg("[KestraService] Failed to marshal request body")
 		return err
 	}
 
-	// Trigger via Kestra API: POST /api/v1/executions/trigger/{namespace}/{flowId}
-	// Or POST /api/v1/executions with body.
-	// Kestra API: POST /api/v1/executions/{namespace}/{flowId}
-	url := fmt.Sprintf("%s/api/v1/executions/%s/%s", s.kestraURL, reqBody.Namespace, reqBody.FlowId)
-
-	// If using Multipart form, it's different. Assuming via JSON for simple inputs.
-	// Note: Kestra inputs are usually multipart for files, but JSON body is supported for simple key-values in recent versions
-	// or via specific endpoints.
-	// Let's assume standard POST to executions endpoint.
-	// Actually, standard Kestra API for triggering is `POST /api/v1/executions/{namespace}/{flowId}` which typically takes multipart/form-data for inputs.
-	// However, let's assume we can send JSON or we implement multipart if needed.
-	// For this exercise, I'll send JSON and assume Kestra is configured/versioned to handle it or I'm using a wrapper.
-	// A safe bet is multipart.
-	// Let's write standard JSON request for now, assuming 0.18+ support or custom controller.
+	log.Debug().Str("url", url).RawJSON("body", jsonBody).Msg("[KestraService] Sending webhook request to Kestra")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if s.username != "" && s.password != "" {
+		req.SetBasicAuth(s.username, s.password)
+	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
+		log.Error().Err(err).Str("url", url).Msg("[KestraService] Failed to send request")
 		return err
 	}
 	defer resp.Body.Close()
 
+	log.Info().Int("status", resp.StatusCode).Msg("[KestraService] Received response from Kestra")
+
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("failed to trigger kestra workflow: %s", resp.Status)
+		// Read body for error details
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		log.Error().Int("status", resp.StatusCode).Str("body", buf.String()).Msg("[KestraService] Kestra reported error")
+		return fmt.Errorf("failed to trigger kestra workflow: %s | Body: %s", resp.Status, buf.String())
 	}
 
 	return nil
 }
 
 func (s *KestraAIService) AnalyzeRepo(ctx context.Context, repo *models.Repository, callbackURL string) error {
+	log.Info().Str("repo_id", repo.ID).Str("flow_id", "ai-repo-analysis").Msg("[KestraService] Analyzing Repository")
+
+	// Construct inputs for Kestra Flow
 	inputs := map[string]interface{}{
 		"repo_id":      repo.ID,
 		"repo_name":    repo.Name,
@@ -104,27 +124,43 @@ func (s *KestraAIService) AnalyzeRepo(ctx context.Context, repo *models.Reposito
 		Wait:      false,
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	// Use Webhook endpoint
+	// Format: /api/v1/executions/webhook/{namespace}/{flowId}/{key}
+	url := fmt.Sprintf("%s/api/v1/executions/webhook/%s/%s/devplus-repo-webhook-key", s.kestraURL, reqBody.Namespace, reqBody.FlowId)
+
+	// For Webhook, we send the inputs directly as the body, not wrapped in KestraExecutionRequest
+	jsonBody, err := json.Marshal(inputs)
 	if err != nil {
+		log.Error().Err(err).Msg("[KestraService] Failed to marshal request body")
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/v1/executions/%s/%s", s.kestraURL, reqBody.Namespace, reqBody.FlowId)
+	log.Debug().Str("url", url).RawJSON("body", jsonBody).Msg("[KestraService] Sending webhook request to Kestra")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if s.username != "" && s.password != "" {
+		req.SetBasicAuth(s.username, s.password)
+	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
+		log.Error().Err(err).Str("url", url).Msg("[KestraService] Failed to send request")
 		return err
 	}
 	defer resp.Body.Close()
 
+	log.Info().Int("status", resp.StatusCode).Msg("[KestraService] Received response from Kestra")
+
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("failed to trigger kestra workflow: %s", resp.Status)
+		// Read body for error details
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		log.Error().Int("status", resp.StatusCode).Str("body", buf.String()).Msg("[KestraService] Kestra reported error")
+		return fmt.Errorf("failed to trigger kestra workflow: %s | Body: %s", resp.Status, buf.String())
 	}
 
 	return nil

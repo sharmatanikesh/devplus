@@ -195,7 +195,7 @@ export default function RepositoryDetailsPage() {
                 ) : (
                     <div className="rounded-md border divide-y">
                         {pullRequests.map(pr => (
-                            <Link key={pr.id} href={`/pull-requests/${pr.repositoryId}/${pr.number}`} className="block group">
+                            <Link key={pr.id} href={`/pull-requests/${pr.repo_id}/${pr.number}`} className="block group">
                                 <div className="p-4 flex justify-between items-start hover:bg-muted/50 transition-colors">
                                     <div className="space-y-1">
                                         <div className="font-medium group-hover:text-primary transition-colors">
