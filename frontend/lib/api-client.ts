@@ -136,6 +136,7 @@ class ApiClient {
   // Metrics
   metrics = {
     list: () => this.get(API_ENDPOINTS.METRICS),
+    personal: (days?: string) => this.get<any>(`/v1/metrics/personal${days ? `?days=${days}` : ''}`),
   };
 
   // Dashboard
