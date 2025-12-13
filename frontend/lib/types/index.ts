@@ -59,8 +59,8 @@ export interface PullRequest {
   commits: number;
   reviewStatus?: "pending" | "approved" | "changes_requested" | "blocked";
   aiAnalysisStatus?: "pending" | "analyzing" | "completed" | "failed";
-  aiSummary?: string;
-  aiDecision?: "approve" | "request_changes" | "block";
+  ai_summary?: string;  // Changed from aiSummary to match backend
+  ai_decision?: "approve" | "request_changes" | "block";  // Changed from aiDecision to match backend
   aiComments?: AIComment[];
   createdAt: string;
   updatedAt: string;

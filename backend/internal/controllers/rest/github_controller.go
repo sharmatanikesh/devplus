@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
@@ -253,30 +254,69 @@ func (c *GithubController) AnalyzePullRequest(w http.ResponseWriter, r *http.Req
 }
 
 func (c *GithubController) HandleAIWebhook(w http.ResponseWriter, r *http.Request) {
+	log.Info().Msg("[HandleAIWebhook] Received webhook callback from Kestra")
+
 	// Parse Webhook Payload
 	var payload struct {
-		PRID     string `json:"pr_id"`
-		Summary  string `json:"summary"`
-		Decision string `json:"decision"`
+		PRID        string `json:"pr_id"`
+		Summary     string `json:"summary"`
+		Decision    string `json:"decision"`
+		RawAnalysis string `json:"raw_analysis"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Error().Err(err).Msg("[HandleAIWebhook] Failed to decode payload")
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
 
+	log.Info().Str("pr_id", payload.PRID).Str("raw_analysis_length", strconv.Itoa(len(payload.RawAnalysis))).Msg("[HandleAIWebhook] Payload decoded")
+
 	if payload.PRID == "" {
+		log.Error().Msg("[HandleAIWebhook] pr_id is missing")
 		http.Error(w, "pr_id is required", http.StatusBadRequest)
 		return
 	}
 
+	// If raw_analysis is provided, parse it to extract summary and decision
+	if payload.RawAnalysis != "" {
+		log.Info().Msg("[HandleAIWebhook] Parsing raw_analysis")
+		// Extract JSON from markdown code blocks
+		// Format: ```json\n{...}\n```
+		start := strings.Index(payload.RawAnalysis, "```json")
+		end := strings.LastIndex(payload.RawAnalysis, "```")
+
+		if start != -1 && end != -1 && end > start {
+			jsonStr := payload.RawAnalysis[start+7 : end] // +7 to skip "```json\n"
+			jsonStr = strings.TrimSpace(jsonStr)
+
+			var analysis struct {
+				Summary  string `json:"summary"`
+				Decision string `json:"decision"`
+			}
+
+			if err := json.Unmarshal([]byte(jsonStr), &analysis); err == nil {
+				payload.Summary = analysis.Summary
+				payload.Decision = analysis.Decision
+				log.Info().Str("summary", payload.Summary).Str("decision", payload.Decision).Msg("[HandleAIWebhook] Parsed analysis")
+			} else {
+				log.Error().Err(err).Msg("[HandleAIWebhook] Failed to parse JSON from raw_analysis")
+			}
+		} else {
+			log.Warn().Msg("[HandleAIWebhook] Could not find JSON code blocks in raw_analysis")
+		}
+	}
+
 	// Update DB
 	ctx := r.Context()
+	log.Info().Str("pr_id", payload.PRID).Msg("[HandleAIWebhook] Updating PR analysis in database")
 	if err := c.service.UpdatePullRequestAnalysis(ctx, payload.PRID, payload.Summary, payload.Decision); err != nil {
+		log.Error().Err(err).Msg("[HandleAIWebhook] Failed to update PR")
 		http.Error(w, "Failed to update PR: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	log.Info().Msg("[HandleAIWebhook] Successfully updated PR analysis")
 	w.WriteHeader(http.StatusOK)
 }
 

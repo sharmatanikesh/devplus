@@ -35,7 +35,7 @@ tasks:
     body: |
       {
         "repo_id": "{{ trigger.body.repo_id ?? inputs.repo_id }}",
-        "summary": "{{ outputs.analyze_repo.result | jq('.summary') }}"
+        "summary": {{ outputs.analyze_repo.prediction.text | jq('.summary') }}
       }
 
 triggers:

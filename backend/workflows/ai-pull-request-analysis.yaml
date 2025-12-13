@@ -82,8 +82,7 @@ tasks:
     body: |
       {
         "pr_id": "{{ trigger.body.pr_id ?? inputs.pr_id }}",
-        "summary": "{{ outputs.analyze_with_gemini.result | jq('.summary') }}",
-        "decision": "{{ outputs.analyze_with_gemini.result | jq('.decision') }}"
+        "raw_analysis": {{ outputs.analyze_with_gemini.predictions[0].content | json }}
       }
 
 triggers:
