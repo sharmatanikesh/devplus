@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import { apiClient } from '@/lib/api-client';
 import { Repository, PullRequest } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ export default function RepositoryDetailsPage() {
 
     const [analyzing, setAnalyzing] = useState(false);
     const [isSyncingPRs, setIsSyncingPRs] = useState(false);
+    const [pollingForAnalysis, setPollingForAnalysis] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -52,15 +54,83 @@ export default function RepositoryDetailsPage() {
         if (!id) return;
         try {
             setAnalyzing(true);
+            setPollingForAnalysis(true);
+            
+            // Trigger the analysis
             await apiClient.repos.analyze(id);
-            // Optionally show toast
-            alert("Analysis triggered! It will appear here shortly.");
+            
+            // Use EventSource for real-time updates via SSE
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+            const streamUrl = baseUrl.endsWith('/api') 
+                ? `${baseUrl}/v1/repos/${id}/analyze/stream`
+                : `${baseUrl}/api/v1/repos/${id}/analyze/stream`;
+            const eventSource = new EventSource(streamUrl, {
+                withCredentials: true
+            });
+            
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.status === 'completed' && data.ai_summary) {
+                    // Update repo with the new summary
+                    setRepo(prev => prev ? { ...prev, ai_summary: data.ai_summary } : null);
+                    setAnalyzing(false);
+                    setPollingForAnalysis(false);
+                    eventSource.close();
+                } else if (data.status === 'error') {
+                    alert('Analysis failed: ' + data.message);
+                    setAnalyzing(false);
+                    setPollingForAnalysis(false);
+                    eventSource.close();
+                }
+            };
+            
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                // Fallback to polling if SSE fails
+                startPolling();
+                eventSource.close();
+            };
+            
+            // Timeout after 2 minutes
+            setTimeout(() => {
+                if (pollingForAnalysis) {
+                    eventSource.close();
+                    setAnalyzing(false);
+                    setPollingForAnalysis(false);
+                    alert('Analysis is taking longer than expected. Please refresh the page later.');
+                }
+            }, 120000);
+            
         } catch (error) {
             console.error("Failed to trigger analysis:", error);
             alert("Failed to start analysis");
-        } finally {
             setAnalyzing(false);
+            setPollingForAnalysis(false);
         }
+    };
+    
+    // Fallback polling function
+    const startPolling = () => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const repoRes = await apiClient.repos.get(id);
+                const updatedRepo = repoRes.data as Repository;
+                
+                if (updatedRepo.ai_summary && updatedRepo.ai_summary !== repo?.ai_summary) {
+                    setRepo(updatedRepo);
+                    setAnalyzing(false);
+                    setPollingForAnalysis(false);
+                    clearInterval(pollInterval);
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        }, 3000);
+        
+        setTimeout(() => {
+            clearInterval(pollInterval);
+        }, 120000);
     };
 
     if (loading) {
@@ -133,8 +203,23 @@ export default function RepositoryDetailsPage() {
                 </div>
             </div>
 
-            {/* AI Summary Section */}
-            {repo.aiSummary && (
+            {/* AI Summary Section - Moved above PR section */}
+            {analyzing && (
+                <div className="bg-muted/30 rounded-lg p-6 border border-purple-200 dark:border-purple-900/50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Sparkles className="h-24 w-24 text-purple-600 animate-pulse" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-3 text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Analyzing Repository...
+                    </h3>
+                    <div className="text-sm text-muted-foreground">
+                        Our AI is analyzing your codebase architecture, patterns, and best practices. This may take a minute or two.
+                    </div>
+                </div>
+            )}
+            
+            {repo.ai_summary && !analyzing && (
                 <div className="bg-muted/30 rounded-lg p-6 border border-purple-200 dark:border-purple-900/50 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10">
                         <Sparkles className="h-24 w-24 text-purple-600" />
@@ -143,8 +228,8 @@ export default function RepositoryDetailsPage() {
                         <Sparkles className="h-5 w-5" />
                         AI Repository Analysis
                     </h3>
-                    <div className="prose dark:prose-invert max-w-none text-sm text-muted-foreground whitespace-pre-wrap">
-                        {repo.aiSummary}
+                    <div className="text-sm leading-relaxed">
+                        <ReactMarkdown>{repo.ai_summary}</ReactMarkdown>
                     </div>
                 </div>
             )}
