@@ -32,7 +32,7 @@ export interface Repository {
   syncStatus: "pending" | "syncing" | "synced" | "error";
   lastSyncedAt?: string;
   webhookConfigured: boolean;
-  aiSummary?: string;
+  ai_summary?: string;  // Backend sends ai_summary (snake_case)
   createdAt: string;
   updatedAt: string;
 }
