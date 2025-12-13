@@ -4,7 +4,13 @@ namespace: devplus
 inputs:
   - name: repo_id
     type: STRING
+  - name: repo_owner
+    type: STRING
   - name: repo_name
+    type: STRING
+  - name: readme
+    type: STRING
+  - name: file_tree
     type: STRING
   - name: callback_url
     type: STRING
@@ -17,24 +23,37 @@ tasks:
     messages:
       - type: USER
         content: |
-          You are a senior software architect. Analyze the repository named "{{ trigger.body.repo_name ?? inputs.repo_name }}".
+          You are a senior software architect. Analyze the following repository:
 
-          Since I cannot provide the full codebase, please provide a generic architectural advice summary for a modern web application, assumming standard best practices.
+          Repository: {{ trigger.body.repo_owner }}/{{ trigger.body.repo_name }}
 
-          Provide a JSON response in the format:
-          {
-            "summary": "High-level summary of the architecture...",
-            "suggestions": ["suggestion 1", "suggestion 2"]
-          }
+          README:
+          ```
+          {{ trigger.body.readme }}
+          ```
+
+          File Structure:
+          ```
+          {{ trigger.body.file_tree }}
+          ```
+
+          Based on the README and file structure, provide an architectural analysis in markdown format with:
+          1. Current architecture and technology stack
+          2. Code organization and project structure
+          3. Potential improvements or refactoring opportunities
+          4. Security and scalability considerations
+          5. Best practices alignment
+
+          Provide your analysis in well-formatted markdown with headers, bullet points, and code blocks where appropriate.
 
   - id: callback_backend
     type: io.kestra.plugin.core.http.Request
-    uri: "{{ trigger.body.callback_url ?? inputs.callback_url }}"
+    uri: "{{ trigger.body.callback_url }}"
     method: POST
     contentType: application/json
     body: |
       {
-        "repo_id": "{{ trigger.body.repo_id ?? inputs.repo_id }}",
+        "repo_id": "{{ trigger.body.repo_id }}",
         "raw_analysis": {{ outputs.analyze_repo.predictions[0].content | json }}
       }
 
