@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -46,7 +47,14 @@ func (c *GithubController) GetRepositories(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *GithubController) GetRepository(w http.ResponseWriter, r *http.Request) {
-	// 1. Get ID from path
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Get ID from path
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
@@ -54,14 +62,14 @@ func (c *GithubController) GetRepository(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 2. Call Service
-	repo, err := c.service.GetRepository(r.Context(), id)
+	// 3. Call Service
+	repo, err := c.service.GetRepository(r.Context(), userVal.ID, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. Return JSON
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(repo)
 }
@@ -131,8 +139,14 @@ func (c *GithubController) SyncRepository(w http.ResponseWriter, r *http.Request
 }
 
 func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Request) {
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
 
-	// 1. Parse Path Params
+	// 2. Parse Path Params
 	vars := mux.Vars(r)
 	owner := vars["owner"]
 	repo := vars["repo"]
@@ -142,8 +156,8 @@ func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 2. Call Service
-	prs, err := c.service.GetPullRequests(r.Context(), owner, repo)
+	// 3. Call Service
+	prs, err := c.service.GetPullRequests(r.Context(), userVal.ID, owner, repo)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -155,7 +169,14 @@ func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *GithubController) GetMetrics(w http.ResponseWriter, r *http.Request) {
-	// Parse Query Params
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Parse Query Params
 	query := r.URL.Query()
 	repoID := query.Get("repo_id")
 	startDate := query.Get("start_date")
@@ -172,45 +193,67 @@ func (c *GithubController) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		filter.EndDate = &endDate
 	}
 
-	stats, err := c.service.GetMetrics(r.Context(), filter)
+	// 3. Call Service
+	stats, err := c.service.GetMetrics(r.Context(), userVal.ID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
 func (c *GithubController) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	// 1. Call Service
-	stats, err := c.service.GetDashboardStats(r.Context())
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Call Service
+	stats, err := c.service.GetDashboardStats(r.Context(), userVal.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Return JSON
+	// 3. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
 func (c *GithubController) GetRecentActivity(w http.ResponseWriter, r *http.Request) {
-	// 1. Call Service
-	// Limit to 10 recent PRs
-	prs, err := c.service.GetRecentPullRequests(r.Context(), 10)
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Call Service - Limit to 10 recent PRs
+	prs, err := c.service.GetRecentPullRequests(r.Context(), userVal.ID, 10)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Return JSON
+	// 3. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prs)
 }
 
 func (c *GithubController) GetPullRequestDetail(w http.ResponseWriter, r *http.Request) {
-	// 1. Get ID and PR Number from path
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Get ID and PR Number from path
 	vars := mux.Vars(r)
 	id := vars["id"]
 	prNumberStr := vars["pr_number"]
@@ -226,14 +269,14 @@ func (c *GithubController) GetPullRequestDetail(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// 2. Call Service
-	pr, err := c.service.GetPullRequest(r.Context(), id, prNumber)
+	// 3. Call Service
+	pr, err := c.service.GetPullRequest(r.Context(), userVal.ID, id, prNumber)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. Return JSON
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(pr)
 }
@@ -413,29 +456,143 @@ func (c *GithubController) AnalyzeRepository(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]string{"status": "analysis_triggered"})
 }
 
+// StreamRepositoryAnalysis handles SSE for real-time analysis updates
+func (c *GithubController) StreamRepositoryAnalysis(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	if repoID == "" {
+		http.Error(w, "Repo ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Set headers for SSE with explicit CORS
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "http://localhost:3000"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Create SSE client
+	client := &SSEClient{
+		RepoID:  repoID,
+		Channel: make(chan string, 10),
+	}
+
+	// Register client
+	GlobalSSEManager.AddClient(repoID, client)
+	defer GlobalSSEManager.RemoveClient(repoID, client)
+
+	log.Info().Str("repo_id", repoID).Msg("[StreamRepositoryAnalysis] Client connected")
+
+	// Send initial connection message
+	fmt.Fprintf(w, "data: %s\n\n", `{"status":"connected"}`)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	// Listen for messages or client disconnect
+	for {
+		select {
+		case msg := <-client.Channel:
+			fmt.Fprintf(w, "%s", msg)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-r.Context().Done():
+			log.Info().Str("repo_id", repoID).Msg("[StreamRepositoryAnalysis] Client disconnected")
+			return
+		}
+	}
+}
+
 func (c *GithubController) HandleRepoAIWebhook(w http.ResponseWriter, r *http.Request) {
+	log.Info().Msg("[HandleRepoAIWebhook] Received webhook callback from Kestra")
+
 	var payload struct {
-		RepoID  string `json:"repo_id"`
-		Summary string `json:"summary"`
+		RepoID      string `json:"repo_id"`
+		Summary     string `json:"summary"`
+		RawAnalysis string `json:"raw_analysis"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Error().Err(err).Msg("[HandleRepoAIWebhook] Failed to decode payload")
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
 
+	log.Info().Str("repo_id", payload.RepoID).Int("raw_analysis_length", len(payload.RawAnalysis)).Msg("[HandleRepoAIWebhook] Payload decoded")
+
 	if payload.RepoID == "" {
+		log.Error().Msg("[HandleRepoAIWebhook] repo_id is missing")
 		http.Error(w, "repo_id is required", http.StatusBadRequest)
 		return
 	}
 
+	// If raw_analysis is provided, parse it to extract summary
+	if payload.RawAnalysis != "" {
+		log.Info().Msg("[HandleRepoAIWebhook] Parsing raw_analysis")
+		// Try to extract JSON from markdown code blocks first
+		// Format: ```json\n{...}\n```
+		start := strings.Index(payload.RawAnalysis, "```json")
+		end := strings.LastIndex(payload.RawAnalysis, "```")
+
+		if start != -1 && end != -1 && end > start {
+			jsonStr := payload.RawAnalysis[start+7 : end] // +7 to skip "```json\n"
+			jsonStr = strings.TrimSpace(jsonStr)
+
+			var analysis struct {
+				Summary     string   `json:"summary"`
+				Suggestions []string `json:"suggestions"`
+			}
+
+			if err := json.Unmarshal([]byte(jsonStr), &analysis); err == nil {
+				payload.Summary = analysis.Summary
+				log.Info().Str("summary", payload.Summary).Msg("[HandleRepoAIWebhook] Parsed analysis from JSON")
+			} else {
+				log.Warn().Err(err).Msg("[HandleRepoAIWebhook] Failed to parse JSON from raw_analysis, using raw content")
+				// If JSON parsing fails, use the entire raw_analysis as summary
+				payload.Summary = payload.RawAnalysis
+			}
+		} else {
+			log.Warn().Msg("[HandleRepoAIWebhook] Could not find JSON code blocks in raw_analysis, using raw content")
+			// If no code blocks found, use the entire raw_analysis as summary
+			payload.Summary = payload.RawAnalysis
+		}
+	}
+
+	if payload.Summary == "" {
+		log.Error().Msg("[HandleRepoAIWebhook] No summary could be extracted")
+		http.Error(w, "summary or raw_analysis is required", http.StatusBadRequest)
+		return
+	}
+
 	// Update DB
-	// Note: Webhooks from Kestra don't have session ctx, so use background ctx or new ctx
+	log.Info().Str("repo_id", payload.RepoID).Msg("[HandleRepoAIWebhook] Updating repository analysis in database")
 	ctx := context.Background()
 	if err := c.service.UpdateRepositoryAnalysis(ctx, payload.RepoID, payload.Summary); err != nil {
+		log.Error().Err(err).Msg("[HandleRepoAIWebhook] Failed to update analysis")
 		http.Error(w, "Failed to update analysis: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	log.Info().Msg("[HandleRepoAIWebhook] Successfully updated repository analysis")
+	
+	// Notify all connected SSE clients
+	notificationData := map[string]interface{}{
+		"status":     "completed",
+		"ai_summary": payload.Summary,
+		"repo_id":    payload.RepoID,
+	}
+	notificationJSON, _ := json.Marshal(notificationData)
+	GlobalSSEManager.NotifyClients(payload.RepoID, FormatSSEMessage(string(notificationJSON)))
+	
+	log.Info().Str("repo_id", payload.RepoID).Int("clients", GlobalSSEManager.GetClientCount(payload.RepoID)).Msg("[HandleRepoAIWebhook] Notified SSE clients")
+	
 	w.WriteHeader(http.StatusOK)
 }

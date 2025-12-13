@@ -89,8 +89,9 @@ func (s *GithubService) SyncRepositories(ctx context.Context, userID string, tok
 func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, token string) ([]*models.PullRequest, error) {
 	log.Info().Str("repo_id", repoID).Msg("[Service.SyncPullRequests] Syncing PRs")
 
-	// 1. Get Repo ID to find owner/name
-	repo, err := s.repo.GetRepository(ctx, repoID)
+	// 1. Get Repo ID to find owner/name (using empty userID since we're in sync context)
+	// Note: This should be called with proper userID in production
+	repo, err := s.repo.GetRepository(ctx, "", repoID)
 	if err != nil {
 		log.Error().Err(err).Msg("[Service.SyncPullRequests] Failed to get repo")
 		return nil, err
@@ -146,28 +147,28 @@ func (s *GithubService) GetRepositories(ctx context.Context, userID string) ([]*
 	return s.repo.GetRepositories(ctx, userID)
 }
 
-func (s *GithubService) GetRepository(ctx context.Context, id string) (*models.Repository, error) {
-	return s.repo.GetRepository(ctx, id)
+func (s *GithubService) GetRepository(ctx context.Context, userID string, id string) (*models.Repository, error) {
+	return s.repo.GetRepository(ctx, userID, id)
 }
 
-func (s *GithubService) GetPullRequests(ctx context.Context, owner, repo string) ([]*models.PullRequest, error) {
-	return s.repo.GetPullRequests(ctx, owner, repo)
+func (s *GithubService) GetPullRequests(ctx context.Context, userID string, owner, repo string) ([]*models.PullRequest, error) {
+	return s.repo.GetPullRequests(ctx, userID, owner, repo)
 }
 
-func (s *GithubService) GetPullRequest(ctx context.Context, repoID string, number int) (*models.PullRequest, error) {
-	return s.repo.GetPullRequest(ctx, repoID, number)
+func (s *GithubService) GetPullRequest(ctx context.Context, userID string, repoID string, number int) (*models.PullRequest, error) {
+	return s.repo.GetPullRequest(ctx, userID, repoID, number)
 }
 
-func (s *GithubService) GetMetrics(ctx context.Context, filter models.MetricsFilter) (*models.DashboardStats, error) {
-	return s.repo.GetMetrics(ctx, filter)
+func (s *GithubService) GetMetrics(ctx context.Context, userID string, filter models.MetricsFilter) (*models.DashboardStats, error) {
+	return s.repo.GetMetrics(ctx, userID, filter)
 }
 
-func (s *GithubService) GetDashboardStats(ctx context.Context) (*models.DashboardStats, error) {
-	return s.repo.GetDashboardStats(ctx)
+func (s *GithubService) GetDashboardStats(ctx context.Context, userID string) (*models.DashboardStats, error) {
+	return s.repo.GetDashboardStats(ctx, userID)
 }
 
-func (s *GithubService) GetRecentPullRequests(ctx context.Context, limit int) ([]*models.PullRequest, error) {
-	return s.repo.GetRecentPullRequests(ctx, limit)
+func (s *GithubService) GetRecentPullRequests(ctx context.Context, userID string, limit int) ([]*models.PullRequest, error) {
+	return s.repo.GetRecentPullRequests(ctx, userID, limit)
 }
 
 func (s *GithubService) GetRepositoryByGithubID(ctx context.Context, githubID int64) (*models.Repository, error) {
@@ -183,7 +184,8 @@ func (s *GithubService) UpdatePullRequestAnalysis(ctx context.Context, prID stri
 }
 
 func (s *GithubService) AnalyzeRepository(ctx context.Context, repoID string) error {
-	repo, err := s.repo.GetRepository(ctx, repoID)
+	// Using empty userID for internal operations - repo lookup by ID
+	repo, err := s.repo.GetRepository(ctx, "", repoID)
 	if err != nil {
 		return err
 	}
@@ -206,7 +208,8 @@ func (s *GithubService) UpdateRepositoryAnalysis(ctx context.Context, repoID str
 }
 
 func (s *GithubService) AnalyzePullRequest(ctx context.Context, repoID string, prNumber int) error {
-	pr, err := s.repo.GetPullRequest(ctx, repoID, prNumber)
+	// Using empty userID for internal operations - PR lookup by repoID and number
+	pr, err := s.repo.GetPullRequest(ctx, "", repoID, prNumber)
 	if err != nil {
 		return err
 	}
