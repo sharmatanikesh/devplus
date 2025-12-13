@@ -73,6 +73,7 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 	// AI Analysis Routes
 	// AI Analysis Routes
 	protected.HandleFunc("/repos/{id}/prs/{pr_number}/analyze", githubController.AnalyzePullRequest).Methods("POST")
+	protected.HandleFunc("/repos/{id}/prs/{pr_number}/analyze/stream", githubController.StreamPullRequestAnalysis).Methods("GET")
 	protected.HandleFunc("/repos/{id}/analyze", githubController.AnalyzeRepository).Methods("POST")
 	protected.HandleFunc("/repos/{id}/analyze/stream", githubController.StreamRepositoryAnalysis).Methods("GET")
 
