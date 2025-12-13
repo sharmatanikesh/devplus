@@ -11,7 +11,7 @@ import (
 
 type GithubRepository interface {
 	UpsertRepository(ctx context.Context, repo *models.Repository) error
-	GetRepositories(ctx context.Context) ([]*models.Repository, error)
+	GetRepositories(ctx context.Context, userID string) ([]*models.Repository, error)
 	GetRepository(ctx context.Context, id string) (*models.Repository, error)
 	GetPullRequests(ctx context.Context, owner, repo string) ([]*models.PullRequest, error)
 	GetPullRequest(ctx context.Context, repoID string, number int) (*models.PullRequest, error)
@@ -39,9 +39,9 @@ func (r *gormGithubRepository) UpsertRepository(ctx context.Context, repo *model
 	}).Create(repo).Error
 }
 
-func (r *gormGithubRepository) GetRepositories(ctx context.Context) ([]*models.Repository, error) {
+func (r *gormGithubRepository) GetRepositories(ctx context.Context, userID string) ([]*models.Repository, error) {
 	var repos []*models.Repository
-	if err := r.db.WithContext(ctx).Order("updated_at desc").Find(&repos).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Order("updated_at desc").Find(&repos).Error; err != nil {
 		return nil, err
 	}
 	return repos, nil

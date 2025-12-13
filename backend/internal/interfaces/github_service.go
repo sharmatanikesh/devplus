@@ -6,7 +6,7 @@ import (
 )
 
 type GithubService interface {
-	GetRepositories(ctx context.Context) ([]*models.Repository, error)
+	GetRepositories(ctx context.Context, userID string) ([]*models.Repository, error)
 	SyncRepositories(ctx context.Context, userID string, token string) ([]*models.Repository, error)
 	SyncPullRequests(ctx context.Context, repoID string, token string) ([]*models.PullRequest, error)
 	GetPullRequests(ctx context.Context, owner, repo string) ([]*models.PullRequest, error)

@@ -142,8 +142,8 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 	return syncedPRs, nil
 }
 
-func (s *GithubService) GetRepositories(ctx context.Context) ([]*models.Repository, error) {
-	return s.repo.GetRepositories(ctx)
+func (s *GithubService) GetRepositories(ctx context.Context, userID string) ([]*models.Repository, error) {
+	return s.repo.GetRepositories(ctx, userID)
 }
 
 func (s *GithubService) GetRepository(ctx context.Context, id string) (*models.Repository, error) {
