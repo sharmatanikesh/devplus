@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v50/github"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 
 	"devplus-backend/internal/models"
@@ -86,11 +87,15 @@ func (s *GithubService) SyncRepositories(ctx context.Context, userID string, tok
 }
 
 func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, token string) ([]*models.PullRequest, error) {
+	log.Info().Str("repo_id", repoID).Msg("[Service.SyncPullRequests] Syncing PRs")
+
 	// 1. Get Repo ID to find owner/name
 	repo, err := s.repo.GetRepository(ctx, repoID)
 	if err != nil {
+		log.Error().Err(err).Msg("[Service.SyncPullRequests] Failed to get repo")
 		return nil, err
 	}
+	log.Info().Str("owner", repo.Owner).Str("repo", repo.Name).Msg("[Service.SyncPullRequests] Found Repo")
 
 	// 2. Setup Client
 	ts := oauth2.StaticTokenSource(
@@ -104,13 +109,17 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 		State:       "open",
 		ListOptions: github.ListOptions{PerPage: 50},
 	}
+	log.Info().Msg("[Service.SyncPullRequests] Fetching PRs from GitHub...")
 	prs, _, err := client.PullRequests.List(ctx, repo.Owner, repo.Name, prOpt)
 	if err != nil {
+		log.Error().Err(err).Msg("[Service.SyncPullRequests] GitHub API Error")
 		return nil, err
 	}
+	log.Info().Int("count", len(prs)).Msg("[Service.SyncPullRequests] Fetched PRs from GitHub")
 
 	var syncedPRs []*models.PullRequest
 	for _, pr := range prs {
+		log.Info().Int("pr_number", pr.GetNumber()).Str("title", pr.GetTitle()).Msg("[Service.SyncPullRequests] Processing PR")
 		prModel := &models.PullRequest{
 			GithubPRID: pr.ID,
 			Number:     github.Int64(int64(pr.GetNumber())),
@@ -123,11 +132,13 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 			UpdatedAt:  &pr.UpdatedAt.Time,
 		}
 		if err := s.repo.UpsertPullRequest(ctx, prModel); err != nil {
+			log.Error().Int("pr_number", pr.GetNumber()).Err(err).Msg("[Service.SyncPullRequests] Upsert Error")
 			return nil, err
 		}
 		syncedPRs = append(syncedPRs, prModel)
 	}
 
+	log.Info().Int("count", len(syncedPRs)).Msg("[Service.SyncPullRequests] Successfully synced PRs")
 	return syncedPRs, nil
 }
 

@@ -3,11 +3,11 @@ package rest
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 
 	"devplus-backend/internal/interfaces"
 	"devplus-backend/internal/middleware"
@@ -92,10 +92,10 @@ func (c *GithubController) SyncRepository(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	// DEBUG LOGGING
-	fmt.Printf("[SyncRepository] Request received for RepoID: %s\n", id)
+	log.Info().Str("repo_id", id).Msg("[SyncRepository] Request received")
 
 	if id == "" {
+		log.Error().Msg("[SyncRepository] Error: Repository ID is empty")
 		http.Error(w, "Repository ID is required", http.StatusBadRequest)
 		return
 	}
@@ -103,22 +103,21 @@ func (c *GithubController) SyncRepository(w http.ResponseWriter, r *http.Request
 	// 2. Get Token
 	token, ok := r.Context().Value(middleware.GithubTokenContextKey).(string)
 	if !ok || token == "" {
-		fmt.Println("[SyncRepository] No token found in context")
+		log.Error().Msg("[SyncRepository] Error: Token not found in context")
 		http.Error(w, "GitHub token not found in context", http.StatusUnauthorized)
 		return
 	}
+	log.Info().Msg("[SyncRepository] Token found, triggering service...")
 
-	// 3. Call Service to Sync PRs (and potentially other repo data in future)
-	fmt.Printf("[SyncRepository] Calling SyncPullRequests for RepoID: %s\n", id)
+	// 3. Call Service to Sync PRs
 	prs, err := c.service.SyncPullRequests(r.Context(), id, token)
 	if err != nil {
-		fmt.Printf("[SyncRepository] Error syncing PRs: %v\n", err)
+		log.Error().Err(err).Msg("[SyncRepository] Service error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("[SyncRepository] Success. Returning %d PRs\n", len(prs))
-
+	log.Info().Int("count", len(prs)).Msg("[SyncRepository] Success. Returning PRs")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prs)
 }
