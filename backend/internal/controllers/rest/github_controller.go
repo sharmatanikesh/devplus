@@ -47,7 +47,14 @@ func (c *GithubController) GetRepositories(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *GithubController) GetRepository(w http.ResponseWriter, r *http.Request) {
-	// 1. Get ID from path
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Get ID from path
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
@@ -55,14 +62,14 @@ func (c *GithubController) GetRepository(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 2. Call Service
-	repo, err := c.service.GetRepository(r.Context(), id)
+	// 3. Call Service
+	repo, err := c.service.GetRepository(r.Context(), userVal.ID, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. Return JSON
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(repo)
 }
@@ -132,8 +139,14 @@ func (c *GithubController) SyncRepository(w http.ResponseWriter, r *http.Request
 }
 
 func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Request) {
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
 
-	// 1. Parse Path Params
+	// 2. Parse Path Params
 	vars := mux.Vars(r)
 	owner := vars["owner"]
 	repo := vars["repo"]
@@ -143,8 +156,8 @@ func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 2. Call Service
-	prs, err := c.service.GetPullRequests(r.Context(), owner, repo)
+	// 3. Call Service
+	prs, err := c.service.GetPullRequests(r.Context(), userVal.ID, owner, repo)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -156,7 +169,14 @@ func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *GithubController) GetMetrics(w http.ResponseWriter, r *http.Request) {
-	// Parse Query Params
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Parse Query Params
 	query := r.URL.Query()
 	repoID := query.Get("repo_id")
 	startDate := query.Get("start_date")
@@ -173,45 +193,67 @@ func (c *GithubController) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		filter.EndDate = &endDate
 	}
 
-	stats, err := c.service.GetMetrics(r.Context(), filter)
+	// 3. Call Service
+	stats, err := c.service.GetMetrics(r.Context(), userVal.ID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
 func (c *GithubController) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	// 1. Call Service
-	stats, err := c.service.GetDashboardStats(r.Context())
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Call Service
+	stats, err := c.service.GetDashboardStats(r.Context(), userVal.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Return JSON
+	// 3. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
 func (c *GithubController) GetRecentActivity(w http.ResponseWriter, r *http.Request) {
-	// 1. Call Service
-	// Limit to 10 recent PRs
-	prs, err := c.service.GetRecentPullRequests(r.Context(), 10)
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Call Service - Limit to 10 recent PRs
+	prs, err := c.service.GetRecentPullRequests(r.Context(), userVal.ID, 10)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Return JSON
+	// 3. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prs)
 }
 
 func (c *GithubController) GetPullRequestDetail(w http.ResponseWriter, r *http.Request) {
-	// 1. Get ID and PR Number from path
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Get ID and PR Number from path
 	vars := mux.Vars(r)
 	id := vars["id"]
 	prNumberStr := vars["pr_number"]
@@ -227,14 +269,14 @@ func (c *GithubController) GetPullRequestDetail(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// 2. Call Service
-	pr, err := c.service.GetPullRequest(r.Context(), id, prNumber)
+	// 3. Call Service
+	pr, err := c.service.GetPullRequest(r.Context(), userVal.ID, id, prNumber)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. Return JSON
+	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(pr)
 }
