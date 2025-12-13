@@ -120,3 +120,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Basic markdown styles */
+.text-sm h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0; }
+.text-sm h2 { font-size: 1.25rem; font-weight: 600; margin: 0.875rem 0; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.25rem; }
+.text-sm h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0; }
+.text-sm h4, .text-sm h5, .text-sm h6 { font-size: 1rem; font-weight: 600; margin: 0.5rem 0; }
+.text-sm p { margin: 0.5rem 0; }
+.text-sm ul, .text-sm ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.text-sm li { margin: 0.25rem 0; }
+.text-sm code { background: hsl(var(--muted)); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875em; }
+.text-sm pre { background: hsl(var(--muted)); padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.5rem 0; }
+.text-sm pre code { background: transparent; padding: 0; }
+.text-sm a { color: hsl(var(--primary)); text-decoration: underline; }
+.text-sm strong { font-weight: 600; }
+.text-sm blockquote { border-left: 3px solid hsl(var(--border)); padding-left: 0.75rem; margin: 0.5rem 0; font-style: italic; color: hsl(var(--muted-foreground)); }
