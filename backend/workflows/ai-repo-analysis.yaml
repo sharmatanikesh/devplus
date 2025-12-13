@@ -1,0 +1,39 @@
+id: ai-repo-analysis
+namespace: devplus
+
+inputs:
+  - name: repo_id
+    type: STRING
+  - name: repo_name
+    type: STRING
+  - name: callback_url
+    type: STRING
+
+tasks:
+  - id: analyze_repo
+    type: io.kestra.plugin.gemini.ChatCompletion
+    apiKey: "{{ secret('GEMINI_API_KEY') }}"
+    model: gemini-pro
+    messages:
+      - role: user
+        content: |
+          You are a senior software architect. Analyze the repository named "{{ inputs.repo_name }}".
+
+          Since I cannot provide the full codebase, please provide a generic architectural advice summary for a modern web application, assumming standard best practices.
+
+          Provide a JSON response in the format:
+          {
+            "summary": "High-level summary of the architecture...",
+            "suggestions": ["suggestion 1", "suggestion 2"]
+          }
+
+  - id: callback_backend
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ inputs.callback_url }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "repo_id": "{{ inputs.repo_id }}",
+        "summary": "{{ outputs.analyze_repo.result | jq('.summary') }}"
+      }

@@ -12,11 +12,13 @@ export const API_ENDPOINTS = {
   // Auth
   AUTH_GITHUB_CONNECT: '/v1/auth/github/login',
   AUTH_GITHUB_CALLBACK: '/v1/auth/github/callback',
+  AUTH_ME: '/v1/auth/me',
 
   // Repos
   REPOS_LIST: '/v1/repos',
   REPOS_DETAIL: (id: string) => `/v1/repos/${id}`,
   REPOS_SYNC: (id: string) => `/v1/repos/${id}/sync`,
+  REPOS_ANALYZE: (id: string) => `/v1/repos/${id}/analyze`,
   REPOS_PRS: (id: string) => `/v1/repos/${id}/prs`,
 
   // PRs
@@ -48,11 +50,6 @@ export const NAVIGATION_ITEMS = [
     title: 'Repositories',
     href: '/repositories',
     icon: 'GitBranch',
-  },
-  {
-    title: 'Pull Requests',
-    href: '/pull-requests',
-    icon: 'GitPullRequest',
   },
   {
     title: 'Metrics',

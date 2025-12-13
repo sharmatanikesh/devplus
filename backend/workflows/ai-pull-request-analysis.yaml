@@ -19,18 +19,23 @@ tasks:
     runner: PROCESS
     commands:
       - echo "Fetching diff for Repo {{ inputs.repo_id }} PR {{ inputs.pr_id }}..."
-      # Real impl: Fetch diff from GitHub using inputs
+      # TODO: Replace with GitHub API diff fetch
 
   - id: analyze_with_gemini
     type: io.kestra.plugin.gemini.ChatCompletion
     apiKey: "{{ secret('GEMINI_API_KEY') }}"
     model: gemini-pro
-    prompt: |
-      You are a code reviewer. Analyze the following Pull Request:
-      Title: {{ inputs.pr_title }}
-      
-      Review the code changes and provide a summary and decision (APPROVE/REQUEST_CHANGES).
-      Return JSON: { "summary": "...", "decision": "..." }
+    messages:
+      - role: user
+        content: |
+          You are a code reviewer. Analyze the following Pull Request:
+          PR Title: {{ inputs.pr_title }}
+
+          Provide a JSON response in the format:
+          {
+            "summary": "...",
+            "decision": "APPROVE or REQUEST_CHANGES"
+          }
 
   - id: callback_backend
     type: io.kestra.plugin.core.http.Request
@@ -40,6 +45,6 @@ tasks:
     body: |
       {
         "pr_id": "{{ inputs.pr_id }}",
-        "summary": "{{ outputs.analyze_with_gemini.choices[0].message.content | jq('.summary') }}",
-        "decision": "{{ outputs.analyze_with_gemini.choices[0].message.content | jq('.decision') }}"
+        "summary": "{{ outputs.analyze_with_gemini.result | jq('.summary') }}",
+        "decision": "{{ outputs.analyze_with_gemini.result | jq('.decision') }}"
       }

@@ -43,15 +43,7 @@ export default function PullRequestDetailsPage() {
         if (!pr) return;
         try {
             setAnalyzing(true);
-            // We need to implement the analyze endpoint call in apiClient or call via raw axios
-            // Since it's not in apiClient explicitly as a method (checked previously, it was in constants but typically exposed)
-            // Let's check api-client.ts again to be sure specific method exists or use generic post
-            // The constants showed API_ENDPOINTS.PR_ANALYZE.
-            // Let's use the generic client for now if specific one isn't there.
-            // Actually apiClient.pullRequests.get is there. Let's assume we can add analyze or just use generic post.
-            // For safety, I will use apiClient.post with the URL constructed from constants or manually.
-
-            await apiClient.post(`/v1/repos/${repositoryId}/prs/${number}/analyze`);
+            await apiClient.pullRequests.analyze(repositoryId, parseInt(number));
 
             // Poll or just wait a bit and refresh? 
             // For now, simple user feedback.

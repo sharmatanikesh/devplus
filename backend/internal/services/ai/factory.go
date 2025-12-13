@@ -8,6 +8,7 @@ import (
 
 type AIService interface {
 	AnalyzePR(ctx context.Context, pr *models.PullRequest, callbackURL string) error
+	AnalyzeRepo(ctx context.Context, repo *models.Repository, callbackURL string) error
 }
 
 type AIFactory struct {

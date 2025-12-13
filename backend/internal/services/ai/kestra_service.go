@@ -89,3 +89,43 @@ func (s *KestraAIService) AnalyzePR(ctx context.Context, pr *models.PullRequest,
 
 	return nil
 }
+
+func (s *KestraAIService) AnalyzeRepo(ctx context.Context, repo *models.Repository, callbackURL string) error {
+	inputs := map[string]interface{}{
+		"repo_id":      repo.ID,
+		"repo_name":    repo.Name,
+		"callback_url": callbackURL,
+	}
+
+	reqBody := KestraExecutionRequest{
+		Namespace: "devplus",
+		FlowId:    "ai-repo-analysis",
+		Inputs:    inputs,
+		Wait:      false,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/v1/executions/%s/%s", s.kestraURL, reqBody.Namespace, reqBody.FlowId)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("failed to trigger kestra workflow: %s", resp.Status)
+	}
+
+	return nil
+}

@@ -32,6 +32,7 @@ export interface Repository {
   syncStatus: "pending" | "syncing" | "synced" | "error";
   lastSyncedAt?: string;
   webhookConfigured: boolean;
+  aiSummary?: string;
   createdAt: string;
   updatedAt: string;
 }

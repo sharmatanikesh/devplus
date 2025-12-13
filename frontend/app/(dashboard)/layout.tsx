@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +27,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { NAVIGATION_ITEMS } from '@/lib/constants';
+import { apiClient } from '@/lib/api-client';
+import { User } from '@/lib/types';
 
 const iconMap = {
   LayoutDashboard,
@@ -42,7 +44,33 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const res = await apiClient.auth.me();
+        if (res.success && res.data) {
+          setUser(res.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+        // Optionally redirect to login if 401, but apiClient interceptor might handle it
+      }
+    }
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.auth.logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -118,13 +146,13 @@ export default function DashboardLayout({
                   className="w-full justify-start px-3 h-auto py-2"
                 >
                   <Avatar className="h-8 w-8 mr-3">
-                    <AvatarImage src="https://github.com/github.png" />
-                    <AvatarFallback>DV</AvatarFallback>
+                    <AvatarImage src={user?.avatarUrl || "https://github.com/github.png"} />
+                    <AvatarFallback>{user?.username?.substring(0, 2).toUpperCase() || "DV"}</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium">Developer</span>
-                    <span className="text-xs text-muted-foreground">
-                      developer@example.com
+                  <div className="flex flex-col items-start text-left overflow-hidden">
+                    <span className="text-sm font-medium truncate w-full">{user?.username || "Loading..."}</span>
+                    <span className="text-xs text-muted-foreground truncate w-full">
+                      {user?.email || "..."}
                     </span>
                   </div>
                 </Button>
@@ -137,7 +165,7 @@ export default function DashboardLayout({
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600">
+                <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>

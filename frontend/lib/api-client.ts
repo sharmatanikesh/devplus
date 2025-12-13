@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS } from './constants';
-import type { ApiResponse } from './types';
+import type { ApiResponse, User } from './types';
 
 // Create Axios instance with default config
 const axiosInstance: AxiosInstance = axios.create({
@@ -114,12 +114,15 @@ class ApiClient {
       }
     },
     logout: () => this.post('/auth/logout'),
+    me: () => this.get<User>(API_ENDPOINTS.AUTH_ME),
   };
 
   // Repositories
   repos = {
     list: () => this.get<any[]>(API_ENDPOINTS.REPOS_LIST),
-    sync: () => this.post<any[]>('/v1/repos/sync'),
+    syncAll: () => this.post<any[]>('/v1/repos/sync'),
+    syncOne: (id: string) => this.post<any[]>(`/v1/repos/${id}/sync`),
+    analyze: (id: string) => this.post<{ status: string }>(API_ENDPOINTS.REPOS_ANALYZE(id)),
     get: (id: string) => this.get(API_ENDPOINTS.REPOS_DETAIL(id)),
     getPullRequests: (owner: string, repo: string) => this.get(`/v1/repos/${owner}/${repo}/pulls`),
   };
@@ -127,6 +130,7 @@ class ApiClient {
   // Pull Requests
   pullRequests = {
     get: (repoId: string, prNumber: number) => this.get(API_ENDPOINTS.PR_DETAIL(repoId, prNumber)),
+    analyze: (repoId: string, prNumber: number) => this.post<{ status: string }>(API_ENDPOINTS.PR_ANALYZE(repoId, prNumber)),
   };
 
   // Metrics

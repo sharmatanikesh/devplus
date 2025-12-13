@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { Repository, PullRequest } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GitFork, Star, Globe, Loader2, GitPullRequest } from 'lucide-react';
+import { ArrowLeft, GitFork, Star, Globe, Loader2, GitPullRequest, Sparkles, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
@@ -17,6 +17,9 @@ export default function RepositoryDetailsPage() {
     const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [analyzing, setAnalyzing] = useState(false);
+    const [isSyncingPRs, setIsSyncingPRs] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -44,6 +47,21 @@ export default function RepositoryDetailsPage() {
         }
         fetchData();
     }, [id]);
+
+    const handleAnalyze = async () => {
+        if (!id) return;
+        try {
+            setAnalyzing(true);
+            await apiClient.repos.analyze(id);
+            // Optionally show toast
+            alert("Analysis triggered! It will appear here shortly.");
+        } catch (error) {
+            console.error("Failed to trigger analysis:", error);
+            alert("Failed to start analysis");
+        } finally {
+            setAnalyzing(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -79,6 +97,24 @@ export default function RepositoryDetailsPage() {
                         )}
                     </div>
                     <div className="flex gap-2">
+                        <Button
+                            variant="default"
+                            onClick={handleAnalyze}
+                            disabled={analyzing}
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                            {analyzing ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Analyzing...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    Analyze Codebase
+                                </>
+                            )}
+                        </Button>
                         <Button variant="outline" onClick={() => window.open(repo.url, '_blank')}>
                             <Globe className="mr-2 h-4 w-4" /> View on GitHub
                         </Button>
@@ -97,13 +133,56 @@ export default function RepositoryDetailsPage() {
                 </div>
             </div>
 
+            {/* AI Summary Section */}
+            {repo.aiSummary && (
+                <div className="bg-muted/30 rounded-lg p-6 border border-purple-200 dark:border-purple-900/50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Sparkles className="h-24 w-24 text-purple-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-3 text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5" />
+                        AI Repository Analysis
+                    </h3>
+                    <div className="prose dark:prose-invert max-w-none text-sm text-muted-foreground whitespace-pre-wrap">
+                        {repo.aiSummary}
+                    </div>
+                </div>
+            )}
+
             {/* PR Section */}
             <div className="space-y-4 pt-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <GitPullRequest className="h-5 w-5" /> Pull Requests
                     </h2>
-                    <Badge variant="outline">{pullRequests.length}</Badge>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                setIsSyncingPRs(true);
+                                try {
+                                    if (apiClient.repos.syncOne) {
+                                        await apiClient.repos.syncOne(id);
+                                    } else {
+                                        await (apiClient.repos as any).syncOne(id);
+                                    }
+                                    // Refresh PRs
+                                    const prsRes = await apiClient.repos.getPullRequests(repo.owner, repo.name);
+                                    setPullRequests(prsRes.data as PullRequest[] || []);
+                                } catch (error) {
+                                    console.error("Failed to sync PRs:", error);
+                                } finally {
+                                    setIsSyncingPRs(false);
+                                }
+                            }}
+                            disabled={isSyncingPRs}
+                        >
+                            <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingPRs ? 'animate-spin' : ''}`} />
+                            {isSyncingPRs ? 'Syncing...' : 'Sync PRs'}
+                        </Button>
+                        <Badge variant="outline">{pullRequests.length}</Badge>
+                    </div>
                 </div>
 
                 {pullRequests.length === 0 ? (
