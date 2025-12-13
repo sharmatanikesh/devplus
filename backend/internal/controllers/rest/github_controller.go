@@ -1,29 +1,26 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 
 	"devplus-backend/internal/interfaces"
 	"devplus-backend/internal/middleware"
 	"devplus-backend/internal/models"
-	"devplus-backend/internal/services/ai"
 )
 
 type GithubController struct {
-	service    interfaces.GithubService
-	aiFactory  *ai.AIFactory
-	backendURL string
+	service interfaces.GithubService
 }
 
-func NewGithubController(service interfaces.GithubService, aiFactory *ai.AIFactory, backendURL string) *GithubController {
+func NewGithubController(service interfaces.GithubService) *GithubController {
 	return &GithubController{
-		service:    service,
-		aiFactory:  aiFactory,
-		backendURL: backendURL,
+		service: service,
 	}
 }
 
@@ -70,11 +67,13 @@ func (c *GithubController) SyncRepositories(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Get User from Context
-	user, ok := r.Context().Value(middleware.UserContextKey).(*models.User)
-	if !ok || user == nil {
+	// Get User from Context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
 	}
+	user := &userVal
 
 	// 2. Call Service (Fetch from GitHub & Upsert)
 	repos, err := c.service.SyncRepositories(r.Context(), user.ID, token)
@@ -86,6 +85,41 @@ func (c *GithubController) SyncRepositories(w http.ResponseWriter, r *http.Reque
 	// 3. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(repos)
+}
+
+func (c *GithubController) SyncRepository(w http.ResponseWriter, r *http.Request) {
+	// 1. Get Repo ID from Path
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	log.Info().Str("repo_id", id).Msg("[SyncRepository] Request received")
+
+	if id == "" {
+		log.Error().Msg("[SyncRepository] Error: Repository ID is empty")
+		http.Error(w, "Repository ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Get Token
+	token, ok := r.Context().Value(middleware.GithubTokenContextKey).(string)
+	if !ok || token == "" {
+		log.Error().Msg("[SyncRepository] Error: Token not found in context")
+		http.Error(w, "GitHub token not found in context", http.StatusUnauthorized)
+		return
+	}
+	log.Info().Msg("[SyncRepository] Token found, triggering service...")
+
+	// 3. Call Service to Sync PRs
+	prs, err := c.service.SyncPullRequests(r.Context(), id, token)
+	if err != nil {
+		log.Error().Err(err).Msg("[SyncRepository] Service error")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Info().Int("count", len(prs)).Msg("[SyncRepository] Success. Returning PRs")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prs)
 }
 
 func (c *GithubController) GetPullRequests(w http.ResponseWriter, r *http.Request) {
@@ -208,25 +242,8 @@ func (c *GithubController) AnalyzePullRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// 2. Fetch PR context
-	pr, err := c.service.GetPullRequest(r.Context(), id, prNumber)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// 3. Trigger AI Service
-	// Always use "kestra" as it's the confirmed workflow engine
-	aiService, err := c.aiFactory.GetAIService("kestra")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Construct Callback URL
-	callbackURL := c.backendURL + "/api/v1/webhook/ai"
-
-	if err := aiService.AnalyzePR(r.Context(), pr, callbackURL); err != nil {
+	// 2. Trigger Analysis via Service
+	if err := c.service.AnalyzePullRequest(r.Context(), id, prNumber); err != nil {
 		http.Error(w, "Failed to trigger analysis: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -320,25 +337,56 @@ func (c *GithubController) HandleGithubWebhook(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Refetch PR to get the generated ID (UUID)
-	savedPR, err := c.service.GetPullRequest(ctx, repo.ID, int(*pr.Number))
-	if err != nil {
-		http.Error(w, "Failed to fetch saved PR: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// 3. Trigger AI Analysis
-	aiService, err := c.aiFactory.GetAIService("kestra")
-	if err != nil {
-		// Log error but assume success for webhook response?
-		// Better to return 500 so GitHub retries if transient.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := c.service.AnalyzePullRequest(ctx, repo.ID, int(*pr.Number)); err != nil {
+		http.Error(w, "Failed to trigger analysis: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	callbackURL := c.backendURL + "/api/v1/webhook/ai"
-	if err := aiService.AnalyzePR(ctx, savedPR, callbackURL); err != nil {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *GithubController) AnalyzeRepository(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	if repoID == "" {
+		http.Error(w, "Repo ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Trigger Analysis via Service
+	if err := c.service.AnalyzeRepository(r.Context(), repoID); err != nil {
 		http.Error(w, "Failed to trigger analysis: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Respond
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "analysis_triggered"})
+}
+
+func (c *GithubController) HandleRepoAIWebhook(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		RepoID  string `json:"repo_id"`
+		Summary string `json:"summary"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if payload.RepoID == "" {
+		http.Error(w, "repo_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Update DB
+	// Note: Webhooks from Kestra don't have session ctx, so use background ctx or new ctx
+	ctx := context.Background()
+	if err := c.service.UpdateRepositoryAnalysis(ctx, payload.RepoID, payload.Summary); err != nil {
+		http.Error(w, "Failed to update analysis: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

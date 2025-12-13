@@ -32,16 +32,17 @@ func main() {
 	database := db.GetInstance()
 
 	// Initialize Services
+	// Initialize AI Factory
+	aiFactory := ai.NewAIFactory(cfg.KestraURL, cfg.KestraUsername, cfg.KestraPassword)
+
+	// Initialize Services
 	authService := auth_service.NewAuthService()
 	githubRepo := repositories.NewGithubRepository(database)
-	githubService := github_service.NewGithubService(githubRepo)
-
-	// Initialize AI Factory
-	aiFactory := ai.NewAIFactory(cfg.KestraURL)
+	githubService := github_service.NewGithubService(githubRepo, aiFactory, cfg.BackendURL)
 
 	// Initialize Controllers
 	authController := rest.NewAuthController(authService)
-	githubController := rest.NewGithubController(githubService, aiFactory, cfg.BackendURL)
+	githubController := rest.NewGithubController(githubService)
 
 	// Initialize Router
 	r := router.SetupRouter(authController, githubController)

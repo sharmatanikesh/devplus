@@ -1,9 +1,12 @@
 package rest
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
+	"devplus-backend/internal/middleware"
+	"devplus-backend/internal/models"
 	"devplus-backend/internal/services/auth_service"
 )
 
@@ -67,10 +70,14 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Logged out"))
 }
 
-// GetCurrentUser is a helper to return current user info based on session
-// This requires the middleware to have populated the context
 func (c *AuthController) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	// Implementation depends on Middleware populating User
-	// For now, simple return
-	w.WriteHeader(http.StatusOK)
+	// Retrieve User from Context (populated by SessionMiddleware)
+	user, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
 }

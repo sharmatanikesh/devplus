@@ -32,6 +32,7 @@ export interface Repository {
   syncStatus: "pending" | "syncing" | "synced" | "error";
   lastSyncedAt?: string;
   webhookConfigured: boolean;
+  aiSummary?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,7 +41,7 @@ export interface Repository {
 export interface PullRequest {
   id: string;
   githubId: number;
-  repositoryId: string;
+  repo_id: string;
   number: number;
   title: string;
   description?: string;
@@ -172,7 +173,7 @@ export interface ImpactAnalysis {
 // ==================== Release Notes Types ====================
 export interface ReleaseNote {
   id: string;
-  repositoryId: string;
+  repo_id: string;
   version: string;
   title: string;
   description: string;

@@ -21,6 +21,7 @@ type GithubRepository interface {
 	GetRepositoryByGithubID(ctx context.Context, githubID int64) (*models.Repository, error)
 	UpsertPullRequest(ctx context.Context, pr *models.PullRequest) error
 	UpdatePullRequestAnalysis(ctx context.Context, prID string, summary, decision string) error
+	UpdateRepositoryAnalysis(ctx context.Context, repoID string, summary string) error
 }
 
 type gormGithubRepository struct {
@@ -149,7 +150,7 @@ func (r *gormGithubRepository) GetMetrics(ctx context.Context, filter models.Met
 
 func (r *gormGithubRepository) GetPullRequest(ctx context.Context, repoID string, number int) (*models.PullRequest, error) {
 	var pr models.PullRequest
-	if err := r.db.WithContext(ctx).Where("repo_id = ? AND number = ?", repoID, number).First(&pr).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Repository").Where("repo_id = ? AND number = ?", repoID, number).First(&pr).Error; err != nil {
 		return nil, err
 	}
 	return &pr, nil
@@ -185,4 +186,10 @@ func (r *gormGithubRepository) UpdatePullRequestAnalysis(ctx context.Context, pr
 			"ai_summary":  summary,
 			"ai_decision": decision,
 		}).Error
+}
+
+func (r *gormGithubRepository) UpdateRepositoryAnalysis(ctx context.Context, repoID string, summary string) error {
+	return r.db.WithContext(ctx).Model(&models.Repository{}).
+		Where("id = ?", repoID).
+		Update("ai_summary", summary).Error
 }

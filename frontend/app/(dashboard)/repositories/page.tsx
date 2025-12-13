@@ -14,7 +14,13 @@ export default function RepositoriesPage() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await apiClient.repos.sync();
+      if (apiClient.repos.syncAll) {
+        await apiClient.repos.syncAll();
+      } else {
+        // Fallback if type definition hasn't reloaded in IDE yet, though runtime should be fine
+        // casting to any to avoid TS error during transition
+        await (apiClient.repos as any).sync();
+      }
       await refetch();
     } catch (error) {
       console.error('Failed to sync repositories:', error);

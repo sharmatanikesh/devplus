@@ -41,6 +41,7 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 
 	// Webhooks (Public)
 	v1.HandleFunc("/webhook/ai", githubController.HandleAIWebhook).Methods("POST")
+	v1.HandleFunc("/webhook/ai/repo", githubController.HandleRepoAIWebhook).Methods("POST")
 	v1.HandleFunc("/webhook/github", githubController.HandleGithubWebhook).Methods("POST")
 
 	// Auth Routes (Nested under /auth)
@@ -55,9 +56,12 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 	protected.Use(middleware.SessionMiddleware)
 
 	// Register existing controllers to protected routes
+	// User Routes
+	protected.HandleFunc("/auth/me", authController.GetCurrentUser).Methods("GET")
 	protected.HandleFunc("/repos", githubController.GetRepositories).Methods("GET")
 	protected.HandleFunc("/repos/{id}", githubController.GetRepository).Methods("GET")
 	protected.HandleFunc("/repos/sync", githubController.SyncRepositories).Methods("POST")
+	protected.HandleFunc("/repos/{id}/sync", githubController.SyncRepository).Methods("POST")
 	protected.HandleFunc("/repos/{owner}/{repo}/pulls", githubController.GetPullRequests).Methods("GET")
 	protected.HandleFunc("/repos/{id}/prs/{pr_number}", githubController.GetPullRequestDetail).Methods("GET")
 
@@ -67,7 +71,9 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 	protected.HandleFunc("/dashboard/recent-prs", githubController.GetRecentActivity).Methods("GET")
 
 	// AI Analysis Routes
+	// AI Analysis Routes
 	protected.HandleFunc("/repos/{id}/prs/{pr_number}/analyze", githubController.AnalyzePullRequest).Methods("POST")
+	protected.HandleFunc("/repos/{id}/analyze", githubController.AnalyzeRepository).Methods("POST")
 
 	// Webhooks (Should ideally be public or verified by signature, but putting under protected for now or separate if needed)
 	// If it's a callback from Kestra/Gemini, it might not have the user session.

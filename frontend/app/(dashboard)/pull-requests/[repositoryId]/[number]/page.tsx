@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { PullRequest } from '@/lib/types';
@@ -10,6 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Bot, CheckCircle, AlertTriangle, AlertOctagon, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { PR_STATUS_COLORS } from '@/lib/constants';
+import { toast } from 'sonner';
+
+const POLL_INTERVAL = 5000; // 5 seconds
+const MAX_POLL_DURATION = 120000; // 2 minutes
 
 export default function PullRequestDetailsPage() {
     const params = useParams();
@@ -21,12 +25,27 @@ export default function PullRequestDetailsPage() {
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const pollStartTimeRef = useRef<number | null>(null);
+    const previousSummaryRef = useRef<string | undefined>(undefined);
+
     async function fetchPR() {
         if (!repositoryId || !number) return;
         try {
             setLoading(true);
             const res = await apiClient.pullRequests.get(repositoryId, parseInt(number));
-            setPr(res.data as PullRequest);
+            const newPr = res.data as PullRequest;
+            setPr(newPr);
+
+            // Check if analysis just completed
+            if (analyzing && newPr.aiSummary && newPr.aiSummary !== previousSummaryRef.current) {
+                toast.success('AI Analysis Complete!', {
+                    description: 'The code review is ready to view.',
+                });
+                stopPolling();
+            }
+
+            previousSummaryRef.current = newPr.aiSummary;
         } catch (err: any) {
             console.error('Failed to fetch PR:', err);
             setError('Failed to load Pull Request details.');
@@ -35,32 +54,63 @@ export default function PullRequestDetailsPage() {
         }
     }
 
+    const startPolling = () => {
+        if (pollIntervalRef.current) return; // Already polling
+
+        pollStartTimeRef.current = Date.now();
+
+        pollIntervalRef.current = setInterval(() => {
+            const elapsed = Date.now() - (pollStartTimeRef.current || 0);
+
+            if (elapsed >= MAX_POLL_DURATION) {
+                toast.warning('Analysis Taking Longer Than Expected', {
+                    description: 'The analysis is still processing. Please check back later.',
+                });
+                stopPolling();
+                return;
+            }
+
+            fetchPR();
+        }, POLL_INTERVAL);
+    };
+
+    const stopPolling = () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            pollStartTimeRef.current = null;
+            setAnalyzing(false);
+        }
+    };
+
     useEffect(() => {
         fetchPR();
+
+        // Cleanup on unmount
+        return () => {
+            stopPolling();
+        };
     }, [repositoryId, number]);
 
     const handleReanalyze = async () => {
         if (!pr) return;
         try {
             setAnalyzing(true);
-            // We need to implement the analyze endpoint call in apiClient or call via raw axios
-            // Since it's not in apiClient explicitly as a method (checked previously, it was in constants but typically exposed)
-            // Let's check api-client.ts again to be sure specific method exists or use generic post
-            // The constants showed API_ENDPOINTS.PR_ANALYZE.
-            // Let's use the generic client for now if specific one isn't there.
-            // Actually apiClient.pullRequests.get is there. Let's assume we can add analyze or just use generic post.
-            // For safety, I will use apiClient.post with the URL constructed from constants or manually.
+            previousSummaryRef.current = pr.aiSummary; // Store current summary
 
-            await apiClient.post(`/v1/repos/${repositoryId}/prs/${number}/analyze`);
+            await apiClient.pullRequests.analyze(repositoryId, parseInt(number));
 
-            // Poll or just wait a bit and refresh? 
-            // For now, simple user feedback.
-            alert('Analysis triggered! Refresh in a few moments.');
-            fetchPR();
+            toast.info('Analysis Started', {
+                description: 'AI is reviewing your code. This may take a minute...',
+            });
+
+            // Start polling for updates
+            startPolling();
         } catch (err) {
             console.error('Failed to trigger analysis:', err);
-            alert('Failed to trigger analysis.');
-        } finally {
+            toast.error('Failed to Start Analysis', {
+                description: 'Please try again later.',
+            });
             setAnalyzing(false);
         }
     };
@@ -126,7 +176,7 @@ export default function PullRequestDetailsPage() {
                         </Button>
                         <Button onClick={handleReanalyze} disabled={analyzing}>
                             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-                            {analyzing ? 'Analyzing...' : 'Re-analyze'}
+                            {analyzing ? 'Analyzing...' : 'Analyze'}
                         </Button>
                     </div>
                 </div>
@@ -139,14 +189,20 @@ export default function PullRequestDetailsPage() {
                         <CardHeader className="bg-primary/5 pb-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Bot className="h-5 w-5 text-primary" />
+                                    <Bot className={`h-5 w-5 text-primary ${analyzing ? 'animate-pulse' : ''}`} />
                                     <CardTitle>AI Review Summary</CardTitle>
                                 </div>
                                 {getDecisionBadge(pr.aiDecision)}
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            {pr.aiSummary ? (
+                            {analyzing ? (
+                                <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3" />
+                                    <p className="text-muted-foreground font-medium">Analyzing code...</p>
+                                    <p className="text-xs text-muted-foreground mt-1">This may take up to 2 minutes</p>
+                                </div>
+                            ) : pr.aiSummary ? (
                                 <div className="prose dark:prose-invert max-w-none">
                                     <div className="whitespace-pre-wrap text-sm leading-relaxed">
                                         {pr.aiSummary}
@@ -156,7 +212,7 @@ export default function PullRequestDetailsPage() {
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Bot className="h-10 w-10 mx-auto mb-3 opacity-20" />
                                     <p>No AI analysis available yet.</p>
-                                    <p className="text-xs mt-1">Click "Re-analyze" to start a new review.</p>
+                                    <p className="text-xs mt-1">Click "Analyze" to start a new review.</p>
                                 </div>
                             )}
                         </CardContent>

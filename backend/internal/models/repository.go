@@ -16,6 +16,7 @@ type Repository struct {
 	InstallationID int64      `gorm:"column:installation_id" json:"installation_id"`
 	UserID         string     `gorm:"column:user_id;type:uuid;not null" json:"user_id"`
 	User           *User      `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"user,omitempty"`
+	AISummary      string     `gorm:"column:ai_summary;type:text" json:"ai_summary"`
 }
 
 func (Repository) TableName() string {

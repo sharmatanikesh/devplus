@@ -38,7 +38,7 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
                             <div className="space-y-1">
                                 <CardTitle className="text-base font-semibold leading-none">
                                     <Link
-                                        href={`/dashboard/repositories/${repo.id}`}
+                                        href={`/repositories/${repo.id}`}
                                         className="hover:underline hover:text-primary transition-colors"
                                     >
                                         {repo.name}
