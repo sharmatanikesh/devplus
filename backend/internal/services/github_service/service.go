@@ -89,8 +89,7 @@ func (s *GithubService) SyncRepositories(ctx context.Context, userID string, tok
 func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, token string) ([]*models.PullRequest, error) {
 	log.Info().Str("repo_id", repoID).Msg("[Service.SyncPullRequests] Syncing PRs")
 
-	// 1. Get Repo ID to find owner/name (using empty userID since we're in sync context)
-	// Note: This should be called with proper userID in production
+	// 1. Get Repo to find owner/name
 	repo, err := s.repo.GetRepository(ctx, "", repoID)
 	if err != nil {
 		log.Error().Err(err).Msg("[Service.SyncPullRequests] Failed to get repo")
@@ -98,29 +97,91 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 	}
 	log.Info().Str("owner", repo.Owner).Str("repo", repo.Name).Msg("[Service.SyncPullRequests] Found Repo")
 
-	// 2. Setup Client
+	// 2. Get existing PRs from database for this repo
+	existingPRs, err := s.repo.GetPullRequestsByRepoID(ctx, repoID)
+	if err != nil {
+		log.Error().Err(err).Msg("[Service.SyncPullRequests] Failed to get existing PRs")
+		return nil, err
+	}
+	
+	// Create map of existing open PRs by number
+	existingOpenPRs := make(map[int64]bool)
+	for _, pr := range existingPRs {
+		if pr.State != nil && *pr.State == "open" {
+			existingOpenPRs[*pr.Number] = true
+		}
+	}
+	log.Info().Int("existing_open_count", len(existingOpenPRs)).Msg("[Service.SyncPullRequests] Found existing open PRs in DB")
+
+	// 3. Setup GitHub Client
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
-	// 3. Fetch Open PRs
+	// 4. Fetch open PRs from GitHub
 	prOpt := &github.PullRequestListOptions{
 		State:       "open",
-		ListOptions: github.ListOptions{PerPage: 50},
+		ListOptions: github.ListOptions{PerPage: 100},
 	}
-	log.Info().Msg("[Service.SyncPullRequests] Fetching PRs from GitHub...")
-	prs, _, err := client.PullRequests.List(ctx, repo.Owner, repo.Name, prOpt)
+	log.Info().Msg("[Service.SyncPullRequests] Fetching open PRs from GitHub...")
+	openPRsFromGitHub, _, err := client.PullRequests.List(ctx, repo.Owner, repo.Name, prOpt)
 	if err != nil {
 		log.Error().Err(err).Msg("[Service.SyncPullRequests] GitHub API Error")
 		return nil, err
 	}
-	log.Info().Int("count", len(prs)).Msg("[Service.SyncPullRequests] Fetched PRs from GitHub")
+	log.Info().Int("count", len(openPRsFromGitHub)).Msg("[Service.SyncPullRequests] Fetched open PRs from GitHub")
 
+	// Create map of open PRs from GitHub
+	openPRNumbers := make(map[int64]bool)
+	for _, pr := range openPRsFromGitHub {
+		openPRNumbers[int64(pr.GetNumber())] = true
+	}
+
+	// 5. Check for PRs that were open in DB but not in GitHub's open list
+	// These PRs have been closed or merged
+	for prNumber := range existingOpenPRs {
+		if !openPRNumbers[prNumber] {
+			log.Info().Int64("pr_number", prNumber).Msg("[Service.SyncPullRequests] PR was open in DB but not in GitHub open list, checking status...")
+			
+			// Fetch individual PR to check if merged or just closed
+			pr, _, err := client.PullRequests.Get(ctx, repo.Owner, repo.Name, int(prNumber))
+			if err != nil {
+				log.Error().Err(err).Int64("pr_number", prNumber).Msg("[Service.SyncPullRequests] Failed to fetch PR details")
+				continue
+			}
+			
+			state := pr.GetState()
+			if pr.GetMerged() {
+				state = "merged"
+				log.Info().Int64("pr_number", prNumber).Msg("[Service.SyncPullRequests] PR was merged")
+			} else {
+				log.Info().Int64("pr_number", prNumber).Msg("[Service.SyncPullRequests] PR was closed without merging")
+			}
+			
+			// Update the PR in database
+			prModel := &models.PullRequest{
+				GithubPRID: pr.ID,
+				Number:     github.Int64(int64(pr.GetNumber())),
+				Title:      github.String(pr.GetTitle()),
+				State:      github.String(state),
+				RepoID:     &repo.ID,
+				AuthorID:   pr.GetUser().ID,
+				AuthorName: github.String(pr.GetUser().GetLogin()),
+				CreatedAt:  &pr.CreatedAt.Time,
+				UpdatedAt:  &pr.UpdatedAt.Time,
+			}
+			if err := s.repo.UpsertPullRequest(ctx, prModel); err != nil {
+				log.Error().Int("pr_number", pr.GetNumber()).Err(err).Msg("[Service.SyncPullRequests] Upsert Error")
+			}
+		}
+	}
+
+	// 6. Upsert all open PRs from GitHub
 	var syncedPRs []*models.PullRequest
-	for _, pr := range prs {
-		log.Info().Int("pr_number", pr.GetNumber()).Str("title", pr.GetTitle()).Msg("[Service.SyncPullRequests] Processing PR")
+	for _, pr := range openPRsFromGitHub {
+		log.Info().Int("pr_number", pr.GetNumber()).Str("title", pr.GetTitle()).Msg("[Service.SyncPullRequests] Processing open PR")
 		prModel := &models.PullRequest{
 			GithubPRID: pr.ID,
 			Number:     github.Int64(int64(pr.GetNumber())),

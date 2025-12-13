@@ -406,10 +406,25 @@ func (c *GithubController) HandleAIWebhook(w http.ResponseWriter, r *http.Reques
 		cleanedAnalysis = strings.TrimSpace(cleanedAnalysis)
 	}
 	
-	if err := json.Unmarshal([]byte(cleanedAnalysis), &aiResponse); err != nil {
-		log.Error().Err(err).Str("raw_analysis", cleanedAnalysis).Msg("[HandleAIWebhook] Failed to parse AI response JSON")
-		http.Error(w, "Failed to parse AI response", http.StatusBadRequest)
-		return
+	// First attempt: Try to parse as-is (handles pretty-printed JSON)
+	err := json.Unmarshal([]byte(cleanedAnalysis), &aiResponse)
+	if err != nil {
+		// Second attempt: Try to unmarshal and re-marshal to fix any formatting issues
+		var rawJSON map[string]interface{}
+		if err2 := json.Unmarshal([]byte(cleanedAnalysis), &rawJSON); err2 == nil {
+			// Successfully parsed as generic JSON, now extract the fields
+			if summary, ok := rawJSON["summary"].(string); ok {
+				aiResponse.Summary = summary
+			}
+			if decision, ok := rawJSON["decision"].(string); ok {
+				aiResponse.Decision = decision
+			}
+			log.Info().Str("summary_length", fmt.Sprintf("%d", len(aiResponse.Summary))).Str("decision", aiResponse.Decision).Msg("[HandleAIWebhook] Parsed AI response using fallback method")
+		} else {
+			log.Error().Err(err).Err(err2).Str("raw_analysis_preview", cleanedAnalysis[:min(500, len(cleanedAnalysis))]).Msg("[HandleAIWebhook] Failed to parse AI response JSON")
+			http.Error(w, "Failed to parse AI response", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Update DB with parsed summary and decision
