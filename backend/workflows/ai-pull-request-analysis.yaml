@@ -27,7 +27,7 @@ tasks:
         REPO="{{ trigger.body.repo_name ?? inputs.repo_name }}"
         PR_NUMBER="{{ trigger.body.pr_number ?? inputs.pr_number }}"
 
-        echo "Fetching diff for $OWNER/$REPO PR #$PR_NUMBER..."
+        echo "Fetching diff for $OWNER/$REPO PR #$PR_NUMBER..." >&2
 
         # Fetch PR diff from GitHub API
         DIFF=$(curl -s -L \
@@ -36,14 +36,15 @@ tasks:
           "https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER")
 
         if [ -z "$DIFF" ]; then
-          echo "Error: Failed to fetch diff"
+          echo "Error: Failed to fetch diff" >&2
           exit 1
         fi
 
-        echo "$DIFF" > /tmp/pr_diff.txt
-        echo "Diff fetched successfully ($(wc -l < /tmp/pr_diff.txt) lines)"
-    outputFiles:
-      - /tmp/pr_diff.txt
+        # Escape the diff for JSON (replace backslashes, quotes, newlines, etc.)
+        DIFF_ESCAPED=$(printf '%s' "$DIFF" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n' | sed 's/\\n$//')
+        
+        # Emit the diff as a Kestra output using the special syntax
+        echo "::{ \"diff\": \"$DIFF_ESCAPED\" }::"
 
   - id: analyze_with_gemini
     type: io.kestra.plugin.gemini.ChatCompletion
@@ -59,7 +60,7 @@ tasks:
 
           Code Changes (Diff):
           ```diff
-          {{ outputs.fetch_diff.outputFiles['/tmp/pr_diff.txt'] }}
+          {{ outputs.fetch_diff.vars.diff }}
           ```
 
           Please provide a thorough code review analyzing:
