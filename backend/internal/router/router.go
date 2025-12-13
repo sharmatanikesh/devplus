@@ -39,6 +39,10 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 		})
 	}).Methods("GET")
 
+	// Webhooks (Public)
+	v1.HandleFunc("/webhook/ai", githubController.HandleAIWebhook).Methods("POST")
+	v1.HandleFunc("/webhook/github", githubController.HandleGithubWebhook).Methods("POST")
+
 	// Auth Routes (Nested under /auth)
 	auth := v1.PathPrefix("/auth").Subrouter()
 	auth.HandleFunc("/github/login", authController.Login).Methods("GET")
@@ -52,12 +56,25 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 
 	// Register existing controllers to protected routes
 	protected.HandleFunc("/repos", githubController.GetRepositories).Methods("GET")
+	protected.HandleFunc("/repos/{id}", githubController.GetRepository).Methods("GET")
 	protected.HandleFunc("/repos/sync", githubController.SyncRepositories).Methods("POST")
 	protected.HandleFunc("/repos/{owner}/{repo}/pulls", githubController.GetPullRequests).Methods("GET")
+	protected.HandleFunc("/repos/{id}/prs/{pr_number}", githubController.GetPullRequestDetail).Methods("GET")
 
 	// Dashboard Routes
+	protected.HandleFunc("/metrics", githubController.GetMetrics).Methods("GET")
 	protected.HandleFunc("/dashboard/stats", githubController.GetDashboardStats).Methods("GET")
 	protected.HandleFunc("/dashboard/recent-prs", githubController.GetRecentActivity).Methods("GET")
+
+	// AI Analysis Routes
+	protected.HandleFunc("/repos/{id}/prs/{pr_number}/analyze", githubController.AnalyzePullRequest).Methods("POST")
+
+	// Webhooks (Should ideally be public or verified by signature, but putting under protected for now or separate if needed)
+	// If it's a callback from Kestra/Gemini, it might not have the user session.
+	// We need a public router for webhooks.
+	// For now, let's assume Kestra can pass the auth token (unlikely) or we use a separate handler.
+	// Since `router.go` likely has a public section, let's check.
+	// I'll register it here for now but ideally it belongs to public routes.
 
 	return router
 }

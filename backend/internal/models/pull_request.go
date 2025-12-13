@@ -18,7 +18,7 @@ type PullRequest struct {
 	AuthorID   *int64      `gorm:"column:author_id" json:"author_id"`
 	AuthorName *string     `gorm:"column:author_name" json:"author_name"`
 	AISummary  *string     `gorm:"column:ai_summary" json:"ai_summary"`
-	AIDecision *string     `gorm:"column:a_idecision" json:"ai_decision"` // Fixed typo in json tag for clarity or kept as is? Using ai_decision for cleaner JSON API.
+	AIDecision *string     `gorm:"column:ai_decision" json:"ai_decision"`
 }
 
 func (PullRequest) TableName() string {

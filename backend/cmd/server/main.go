@@ -8,9 +8,12 @@ import (
 	"syscall"
 	"time"
 
+	"devplus-backend/internal/config"
 	"devplus-backend/internal/controllers/rest"
 	"devplus-backend/internal/db"
+	"devplus-backend/internal/repositories"
 	"devplus-backend/internal/router"
+	"devplus-backend/internal/services/ai"
 	"devplus-backend/internal/services/auth_service"
 	"devplus-backend/internal/services/github_service"
 	"devplus-backend/pkg/logger"
@@ -22,28 +25,29 @@ func main() {
 	// Initialize Logger
 	logger.InitLogger()
 
+	// Initialize Config
+	cfg := config.LoadConfig()
+
 	// Initialize Database
 	database := db.GetInstance()
 
 	// Initialize Services
 	authService := auth_service.NewAuthService()
-	githubService := github_service.NewGithubService(database)
+	githubRepo := repositories.NewGithubRepository(database)
+	githubService := github_service.NewGithubService(githubRepo)
+
+	// Initialize AI Factory
+	aiFactory := ai.NewAIFactory(cfg.KestraURL)
 
 	// Initialize Controllers
 	authController := rest.NewAuthController(authService)
-	githubController := rest.NewGithubController(githubService)
+	githubController := rest.NewGithubController(githubService, aiFactory, cfg.BackendURL)
 
 	// Initialize Router
 	r := router.SetupRouter(authController, githubController)
 
-	// Let's remove the redundancy.
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	addr := ":" + port
+	// Start Server
+	addr := ":" + cfg.Port
 	server := &http.Server{
 		Addr:    addr,
 		Handler: r,

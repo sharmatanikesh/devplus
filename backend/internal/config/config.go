@@ -1,10 +1,10 @@
 package config
 
 import (
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
@@ -19,15 +19,17 @@ type Config struct {
 	GithubWebhookSecret string
 	GithubRedirectURI   string
 	FrontendURL         string
+	KestraURL           string
+	BackendURL          string
 }
 
 func LoadConfig() *Config {
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+		log.Warn().Msg("No .env file found")
 	}
 
 	return &Config{
-		Port:                getEnv("PORT", "8080"),
+		Port:                getEnv("PORT", "8081"),
 		DBHost:              getEnv("DB_HOST", "localhost"),
 		DBUser:              getEnv("DB_USER", "postgres"),
 		DBPassword:          getEnv("DB_PASSWORD", "postgres"),
@@ -38,6 +40,8 @@ func LoadConfig() *Config {
 		GithubWebhookSecret: getEnv("GITHUB_WEBHOOK_SECRET", ""),
 		GithubRedirectURI:   getEnv("GITHUB_REDIRECT_URI", ""),
 		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000/dashboard"),
+		KestraURL:           getEnv("KESTRA_URL", "http://localhost:8080"),
+		BackendURL:          getEnv("BACKEND_URL", "http://host.docker.internal:8080"),
 	}
 }
 

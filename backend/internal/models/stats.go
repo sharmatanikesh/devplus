@@ -6,3 +6,9 @@ type DashboardStats struct {
 	MergedPRs   int64 `json:"merged_prs"`
 	ActiveRepos int64 `json:"active_repos"`
 }
+
+type MetricsFilter struct {
+	RepoID    string
+	StartDate *string // RFC3339
+	EndDate   *string // RFC3339
+}

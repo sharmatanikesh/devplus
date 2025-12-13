@@ -1,0 +1,45 @@
+id: ai-pull-request-analysis
+namespace: devplus
+
+inputs:
+  - name: pr_id
+    type: STRING
+  - name: pr_number
+    type: INT
+  - name: repo_id
+    type: STRING
+  - name: pr_title
+    type: STRING
+  - name: callback_url
+    type: STRING
+
+tasks:
+  - id: fetch_diff
+    type: io.kestra.plugin.scripts.shell.Commands
+    runner: PROCESS
+    commands:
+      - echo "Fetching diff for Repo {{ inputs.repo_id }} PR {{ inputs.pr_id }}..."
+      # Real impl: Fetch diff from GitHub using inputs
+
+  - id: analyze_with_gemini
+    type: io.kestra.plugin.gemini.ChatCompletion
+    apiKey: "{{ secret('GEMINI_API_KEY') }}"
+    model: gemini-pro
+    prompt: |
+      You are a code reviewer. Analyze the following Pull Request:
+      Title: {{ inputs.pr_title }}
+      
+      Review the code changes and provide a summary and decision (APPROVE/REQUEST_CHANGES).
+      Return JSON: { "summary": "...", "decision": "..." }
+
+  - id: callback_backend
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ inputs.callback_url }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "pr_id": "{{ inputs.pr_id }}",
+        "summary": "{{ outputs.analyze_with_gemini.choices[0].message.content | jq('.summary') }}",
+        "decision": "{{ outputs.analyze_with_gemini.choices[0].message.content | jq('.decision') }}"
+      }
