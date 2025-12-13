@@ -13,9 +13,9 @@ tasks:
   - id: analyze_repo
     type: io.kestra.plugin.gemini.ChatCompletion
     apiKey: "{{ secret('GEMINI_API_KEY') }}"
-    model: gemini-pro
+    model: gemini-2.0-flash-exp
     messages:
-      - role: user
+      - type: USER
         content: |
           You are a senior software architect. Analyze the repository named "{{ trigger.body.repo_name ?? inputs.repo_name }}".
 
