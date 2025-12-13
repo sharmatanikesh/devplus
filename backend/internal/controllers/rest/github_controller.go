@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -413,29 +414,143 @@ func (c *GithubController) AnalyzeRepository(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]string{"status": "analysis_triggered"})
 }
 
+// StreamRepositoryAnalysis handles SSE for real-time analysis updates
+func (c *GithubController) StreamRepositoryAnalysis(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	if repoID == "" {
+		http.Error(w, "Repo ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Set headers for SSE with explicit CORS
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "http://localhost:3000"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Create SSE client
+	client := &SSEClient{
+		RepoID:  repoID,
+		Channel: make(chan string, 10),
+	}
+
+	// Register client
+	GlobalSSEManager.AddClient(repoID, client)
+	defer GlobalSSEManager.RemoveClient(repoID, client)
+
+	log.Info().Str("repo_id", repoID).Msg("[StreamRepositoryAnalysis] Client connected")
+
+	// Send initial connection message
+	fmt.Fprintf(w, "data: %s\n\n", `{"status":"connected"}`)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	// Listen for messages or client disconnect
+	for {
+		select {
+		case msg := <-client.Channel:
+			fmt.Fprintf(w, "%s", msg)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-r.Context().Done():
+			log.Info().Str("repo_id", repoID).Msg("[StreamRepositoryAnalysis] Client disconnected")
+			return
+		}
+	}
+}
+
 func (c *GithubController) HandleRepoAIWebhook(w http.ResponseWriter, r *http.Request) {
+	log.Info().Msg("[HandleRepoAIWebhook] Received webhook callback from Kestra")
+
 	var payload struct {
-		RepoID  string `json:"repo_id"`
-		Summary string `json:"summary"`
+		RepoID      string `json:"repo_id"`
+		Summary     string `json:"summary"`
+		RawAnalysis string `json:"raw_analysis"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Error().Err(err).Msg("[HandleRepoAIWebhook] Failed to decode payload")
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
 
+	log.Info().Str("repo_id", payload.RepoID).Int("raw_analysis_length", len(payload.RawAnalysis)).Msg("[HandleRepoAIWebhook] Payload decoded")
+
 	if payload.RepoID == "" {
+		log.Error().Msg("[HandleRepoAIWebhook] repo_id is missing")
 		http.Error(w, "repo_id is required", http.StatusBadRequest)
 		return
 	}
 
+	// If raw_analysis is provided, parse it to extract summary
+	if payload.RawAnalysis != "" {
+		log.Info().Msg("[HandleRepoAIWebhook] Parsing raw_analysis")
+		// Try to extract JSON from markdown code blocks first
+		// Format: ```json\n{...}\n```
+		start := strings.Index(payload.RawAnalysis, "```json")
+		end := strings.LastIndex(payload.RawAnalysis, "```")
+
+		if start != -1 && end != -1 && end > start {
+			jsonStr := payload.RawAnalysis[start+7 : end] // +7 to skip "```json\n"
+			jsonStr = strings.TrimSpace(jsonStr)
+
+			var analysis struct {
+				Summary     string   `json:"summary"`
+				Suggestions []string `json:"suggestions"`
+			}
+
+			if err := json.Unmarshal([]byte(jsonStr), &analysis); err == nil {
+				payload.Summary = analysis.Summary
+				log.Info().Str("summary", payload.Summary).Msg("[HandleRepoAIWebhook] Parsed analysis from JSON")
+			} else {
+				log.Warn().Err(err).Msg("[HandleRepoAIWebhook] Failed to parse JSON from raw_analysis, using raw content")
+				// If JSON parsing fails, use the entire raw_analysis as summary
+				payload.Summary = payload.RawAnalysis
+			}
+		} else {
+			log.Warn().Msg("[HandleRepoAIWebhook] Could not find JSON code blocks in raw_analysis, using raw content")
+			// If no code blocks found, use the entire raw_analysis as summary
+			payload.Summary = payload.RawAnalysis
+		}
+	}
+
+	if payload.Summary == "" {
+		log.Error().Msg("[HandleRepoAIWebhook] No summary could be extracted")
+		http.Error(w, "summary or raw_analysis is required", http.StatusBadRequest)
+		return
+	}
+
 	// Update DB
-	// Note: Webhooks from Kestra don't have session ctx, so use background ctx or new ctx
+	log.Info().Str("repo_id", payload.RepoID).Msg("[HandleRepoAIWebhook] Updating repository analysis in database")
 	ctx := context.Background()
 	if err := c.service.UpdateRepositoryAnalysis(ctx, payload.RepoID, payload.Summary); err != nil {
+		log.Error().Err(err).Msg("[HandleRepoAIWebhook] Failed to update analysis")
 		http.Error(w, "Failed to update analysis: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	log.Info().Msg("[HandleRepoAIWebhook] Successfully updated repository analysis")
+	
+	// Notify all connected SSE clients
+	notificationData := map[string]interface{}{
+		"status":     "completed",
+		"ai_summary": payload.Summary,
+		"repo_id":    payload.RepoID,
+	}
+	notificationJSON, _ := json.Marshal(notificationData)
+	GlobalSSEManager.NotifyClients(payload.RepoID, FormatSSEMessage(string(notificationJSON)))
+	
+	log.Info().Str("repo_id", payload.RepoID).Int("clients", GlobalSSEManager.GetClientCount(payload.RepoID)).Msg("[HandleRepoAIWebhook] Notified SSE clients")
+	
 	w.WriteHeader(http.StatusOK)
 }
