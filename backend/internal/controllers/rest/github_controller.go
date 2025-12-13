@@ -26,8 +26,15 @@ func NewGithubController(service interfaces.GithubService) *GithubController {
 }
 
 func (c *GithubController) GetRepositories(w http.ResponseWriter, r *http.Request) {
+	// 1. Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
 	// 2. Call Service (Fetch from DB)
-	repos, err := c.service.GetRepositories(r.Context())
+	repos, err := c.service.GetRepositories(r.Context(), userVal.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
