@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import { apiClient } from '@/lib/api-client';
 import { PullRequest } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -113,8 +114,51 @@ export default function PullRequestDetailsPage() {
                 description: 'AI is reviewing your code. This may take a minute...',
             });
 
-            // Start polling for updates
-            startPolling();
+            // Use EventSource for real-time updates via SSE
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+            const streamUrl = baseUrl.endsWith('/api') 
+                ? `${baseUrl}/v1/repos/${repositoryId}/prs/${number}/analyze/stream`
+                : `${baseUrl}/api/v1/repos/${repositoryId}/prs/${number}/analyze/stream`;
+            const eventSource = new EventSource(streamUrl, {
+                withCredentials: true
+            });
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.status === 'completed' && data.ai_summary) {
+                    // Update PR with the new summary
+                    setPr(prev => prev ? { 
+                        ...prev, 
+                        ai_summary: data.ai_summary,
+                        ai_decision: data.ai_decision
+                    } : null);
+                    setAnalyzing(false);
+                    eventSource.close();
+                    stopPolling();
+                    toast.success('AI Analysis Complete!', {
+                        description: 'The code review is ready to view.',
+                    });
+                } else if (data.status === 'error') {
+                    toast.error('Analysis Failed', {
+                        description: data.message || 'Please try again later.',
+                    });
+                    setAnalyzing(false);
+                    eventSource.close();
+                    stopPolling();
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                // Fallback to polling if SSE fails
+                toast.info('Using fallback polling', {
+                    description: 'Checking for updates every few seconds...',
+                });
+                startPolling();
+                eventSource.close();
+            };
+
         } catch (err) {
             console.error('Failed to trigger analysis:', err);
             toast.error('Failed to Start Analysis', {
@@ -208,22 +252,29 @@ export default function PullRequestDetailsPage() {
                         </CardHeader>
                         <CardContent className="pt-6">
                             {analyzing ? (
-                                <div className="text-center py-8">
-                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3" />
-                                    <p className="text-muted-foreground font-medium">Analyzing code...</p>
-                                    <p className="text-xs text-muted-foreground mt-1">This may take up to 2 minutes</p>
-                                </div>
-                            ) : pr.ai_summary ? (
-                                <div className="prose dark:prose-invert max-w-none">
-                                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                        {pr.ai_summary}
+                                <div className="bg-muted/30 rounded-lg p-8 border border-purple-200 dark:border-purple-900/50 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                        <Bot className="h-20 w-20 text-purple-600 animate-pulse" />
+                                    </div>
+                                    <div className="relative z-10">
+                                        <div className="flex items-center justify-center gap-3 mb-3">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                                            <p className="text-lg font-medium">Analyzing code...</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground text-center">
+                                            Our AI is reviewing your pull request. This may take a minute or two.
+                                        </p>
                                     </div>
                                 </div>
+                            ) : pr.ai_summary ? (
+                                <div className="text-sm leading-relaxed">
+                                    <ReactMarkdown>{pr.ai_summary}</ReactMarkdown>
+                                </div>
                             ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <Bot className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                                    <p>No AI analysis available yet.</p>
-                                    <p className="text-xs mt-1">Click "Analyze" to start a new review.</p>
+                                <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                    <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-40" />
+                                    <p className="font-medium">No AI analysis available yet</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Click &quot;Analyze&quot; to start a new review</p>
                                 </div>
                             )}
                         </CardContent>

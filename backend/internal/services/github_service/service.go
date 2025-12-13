@@ -159,6 +159,10 @@ func (s *GithubService) GetPullRequest(ctx context.Context, userID string, repoI
 	return s.repo.GetPullRequest(ctx, userID, repoID, number)
 }
 
+func (s *GithubService) GetPullRequestByID(ctx context.Context, prID string) (*models.PullRequest, error) {
+	return s.repo.GetPullRequestByID(ctx, prID)
+}
+
 func (s *GithubService) GetMetrics(ctx context.Context, userID string, filter models.MetricsFilter) (*models.DashboardStats, error) {
 	return s.repo.GetMetrics(ctx, userID, filter)
 }

@@ -15,6 +15,7 @@ type GithubRepository interface {
 	GetRepository(ctx context.Context, userID string, id string) (*models.Repository, error)
 	GetPullRequests(ctx context.Context, userID string, owner, repo string) ([]*models.PullRequest, error)
 	GetPullRequest(ctx context.Context, userID string, repoID string, number int) (*models.PullRequest, error)
+	GetPullRequestByID(ctx context.Context, prID string) (*models.PullRequest, error)
 	GetDashboardStats(ctx context.Context, userID string) (*models.DashboardStats, error)
 	GetMetrics(ctx context.Context, userID string, filter models.MetricsFilter) (*models.DashboardStats, error)
 	GetRecentPullRequests(ctx context.Context, userID string, limit int) ([]*models.PullRequest, error)
@@ -168,6 +169,14 @@ func (r *gormGithubRepository) GetPullRequest(ctx context.Context, userID string
 		query = query.Joins("JOIN repositories ON repositories.id = pull_requests.repo_id").Where("repositories.user_id = ?", userID)
 	}
 	if err := query.First(&pr).Error; err != nil {
+		return nil, err
+	}
+	return &pr, nil
+}
+
+func (r *gormGithubRepository) GetPullRequestByID(ctx context.Context, prID string) (*models.PullRequest, error) {
+	var pr models.PullRequest
+	if err := r.db.WithContext(ctx).Preload("Repository").Where("id = ?", prID).First(&pr).Error; err != nil {
 		return nil, err
 	}
 	return &pr, nil

@@ -14,6 +14,7 @@ type GithubService interface {
 	GetRecentPullRequests(ctx context.Context, userID string, limit int) ([]*models.PullRequest, error)
 	GetRepository(ctx context.Context, userID string, id string) (*models.Repository, error)
 	GetPullRequest(ctx context.Context, userID string, repoID string, number int) (*models.PullRequest, error)
+	GetPullRequestByID(ctx context.Context, prID string) (*models.PullRequest, error)
 	GetMetrics(ctx context.Context, userID string, filter models.MetricsFilter) (*models.DashboardStats, error)
 	GetRepositoryByGithubID(ctx context.Context, githubID int64) (*models.Repository, error)
 	UpsertPullRequest(ctx context.Context, pr *models.PullRequest) error
