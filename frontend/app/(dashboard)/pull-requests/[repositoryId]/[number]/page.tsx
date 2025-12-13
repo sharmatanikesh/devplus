@@ -38,18 +38,19 @@ export default function PullRequestDetailsPage() {
             setPr(newPr);
 
             // Check if analysis just completed
-            if (analyzing && newPr.aiSummary && newPr.aiSummary !== previousSummaryRef.current) {
+            if (analyzing && newPr.ai_summary && newPr.ai_summary !== previousSummaryRef.current) {
                 toast.success('AI Analysis Complete!', {
                     description: 'The code review is ready to view.',
                 });
                 stopPolling();
             }
 
-            previousSummaryRef.current = newPr.aiSummary;
+            previousSummaryRef.current = newPr.ai_summary;
         } catch (err: any) {
             console.error('Failed to fetch PR:', err);
             setError('Failed to load Pull Request details.');
         } finally {
+            console.log('[fetchPR] Setting loading to false');
             setLoading(false);
         }
     }
@@ -92,11 +93,19 @@ export default function PullRequestDetailsPage() {
         };
     }, [repositoryId, number]);
 
+    // Reset analyzing state when PR data loads
+    useEffect(() => {
+        if (pr && !pollIntervalRef.current) {
+            // If we have PR data and we're not actively polling, stop analyzing state
+            setAnalyzing(false);
+        }
+    }, [pr]);
+
     const handleReanalyze = async () => {
         if (!pr) return;
         try {
             setAnalyzing(true);
-            previousSummaryRef.current = pr.aiSummary; // Store current summary
+            previousSummaryRef.current = pr.ai_summary; // Store current summary
 
             await apiClient.pullRequests.analyze(repositoryId, parseInt(number));
 
@@ -149,6 +158,8 @@ export default function PullRequestDetailsPage() {
         }
     };
 
+    const hasExistingAnalysis = pr.ai_summary && pr.ai_summary.trim() !== '';
+
     return (
         <div className="space-y-6 max-w-5xl mx-auto pb-10">
             {/* Header */}
@@ -176,7 +187,7 @@ export default function PullRequestDetailsPage() {
                         </Button>
                         <Button onClick={handleReanalyze} disabled={analyzing}>
                             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-                            {analyzing ? 'Analyzing...' : 'Analyze'}
+                            {analyzing ? 'Analyzing...' : hasExistingAnalysis ? 'Re-analyze' : 'Analyze'}
                         </Button>
                     </div>
                 </div>
@@ -192,7 +203,7 @@ export default function PullRequestDetailsPage() {
                                     <Bot className={`h-5 w-5 text-primary ${analyzing ? 'animate-pulse' : ''}`} />
                                     <CardTitle>AI Review Summary</CardTitle>
                                 </div>
-                                {getDecisionBadge(pr.aiDecision)}
+                                {getDecisionBadge(pr.ai_decision)}
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
@@ -202,10 +213,10 @@ export default function PullRequestDetailsPage() {
                                     <p className="text-muted-foreground font-medium">Analyzing code...</p>
                                     <p className="text-xs text-muted-foreground mt-1">This may take up to 2 minutes</p>
                                 </div>
-                            ) : pr.aiSummary ? (
+                            ) : pr.ai_summary ? (
                                 <div className="prose dark:prose-invert max-w-none">
                                     <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                        {pr.aiSummary}
+                                        {pr.ai_summary}
                                     </div>
                                 </div>
                             ) : (
