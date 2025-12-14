@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+
 import { useEffect } from 'react';
 import { useRepositories } from '@/hooks/use-repositories';
 import { RepositoryList } from '@/components/repositories/repository-list';
@@ -29,7 +31,7 @@ export default function RepositoriesPage() {
   const { repositories, isLoading, error, refetch } = useRepositories();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+
   const dispatch = useAppDispatch();
   const { selectedRepoIds, isInitialized } = useAppSelector(
     (state) => state.repositoryVisibility
@@ -54,7 +56,7 @@ export default function RepositoriesPage() {
     }
   };
 
-  const filteredRepositories = repositories.filter(repo => 
+  const filteredRepositories = repositories.filter(repo =>
     selectedRepoIds.includes(repo.id)
   );
 
@@ -65,7 +67,6 @@ export default function RepositoriesPage() {
         await apiClient.repos.syncAll();
       } else {
         // Fallback if type definition hasn't reloaded in IDE yet, though runtime should be fine
-        // casting to any to avoid TS error during transition
         await (apiClient.repos as any).sync();
       }
       await refetch();
@@ -88,10 +89,14 @@ export default function RepositoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Repositories</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">Repositories</h1>
           <p className="text-muted-foreground">
             Manage your synced repositories and configurations
           </p>
@@ -99,7 +104,7 @@ export default function RepositoriesPage() {
         <div className="flex gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="border-sky-100 hover:bg-sky-50 hover:text-sky-600 dark:border-sky-900/50 dark:hover:bg-sky-900/20">
                 <ListFilter className="mr-2 h-4 w-4" />
                 Edit List
               </Button>
@@ -138,7 +143,7 @@ export default function RepositoriesPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Button disabled={isLoading || isSyncing} onClick={handleSync}>
+          <Button disabled={isLoading || isSyncing} onClick={handleSync} className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg shadow-sky-500/20">
             {isSyncing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -152,16 +157,17 @@ export default function RepositoriesPage() {
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-[180px] rounded-xl border bg-card text-card-foreground shadow-sm p-6 space-y-4">
-              <div className="h-6 w-1/2 bg-muted animate-pulse rounded" />
-              <div className="h-4 w-1/3 bg-muted animate-pulse rounded" />
-              <div className="mt-auto pt-4 h-8 w-full bg-muted animate-pulse rounded" />
+            <div key={i} className="h-[180px] rounded-xl border border-sky-100 dark:border-sky-900/50 bg-card/50 p-6 space-y-4 relative overflow-hidden">
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-sky-500/5 to-transparent animate-shimmer" style={{ transform: 'translateX(-100%)' }} />
+              <div className="h-6 w-1/2 bg-muted/50 rounded animate-pulse" />
+              <div className="h-4 w-1/3 bg-muted/50 rounded animate-pulse" />
+              <div className="mt-auto pt-4 h-8 w-full bg-muted/50 rounded animate-pulse" />
             </div>
           ))}
         </div>
       ) : (
         <RepositoryList repositories={filteredRepositories} />
       )}
-    </div>
+    </motion.div>
   );
 }

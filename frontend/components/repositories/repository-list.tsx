@@ -32,14 +32,14 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {repositories.map((repo) => (
-                <Card key={repo.id} className="flex flex-col">
+                <Card key={repo.id} className="flex flex-col hover:shadow-xl hover:scale-[1.01] transition-all duration-200 border-border/50 bg-card/50 hover:border-sky-200 dark:hover:border-sky-800">
                     <CardHeader>
                         <div className="flex items-start justify-between gap-2">
                             <div className="space-y-1">
                                 <CardTitle className="text-base font-semibold leading-none">
                                     <Link
                                         href={`/repositories/${repo.id}`}
-                                        className="hover:underline hover:text-primary transition-colors"
+                                        className="hover:underline hover:text-sky-600 transition-colors"
                                     >
                                         {repo.name}
                                     </Link>
@@ -48,7 +48,7 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
                                     {repo.owner}
                                 </CardDescription>
                             </div>
-                            <Badge variant="outline" className="shrink-0">
+                            <Badge variant="outline" className="shrink-0 bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-sky-100 dark:border-sky-800">
                                 Public
                             </Badge>
                         </div>
@@ -63,7 +63,7 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
                                     </span>
                                 )}
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20" asChild>
                                 <a href={repo.url} target="_blank" rel="noopener noreferrer">
                                     <ExternalLink className="h-4 w-4" />
                                     <span className="sr-only">View on GitHub</span>
