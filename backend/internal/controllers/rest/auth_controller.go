@@ -45,14 +45,14 @@ func (c *AuthController) Callback(w http.ResponseWriter, r *http.Request) {
 
 	// Set Session Cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    session.ID,
-		Expires:  session.ExpiresAt,
-		HttpOnly: true,
-		Secure:   true, // Set to true in production (checking TLS)
-		Path:     "/",
-		SameSite: http.SameSiteLaxMode,
-	})
+    Name:     "session_token",
+    Value:    session.ID,
+    Expires:  session.ExpiresAt,
+    HttpOnly: true,
+    Secure:   true, // MUST be true in production
+    Path:     "/",
+    SameSite: http.SameSiteNoneMode, // MUST be None for cross-site
+})
 
 	// Redirect to Frontend Dashboard
 	http.Redirect(w, r, c.service.Config.FrontendURL, http.StatusTemporaryRedirect)
