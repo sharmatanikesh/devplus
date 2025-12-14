@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 import { motion } from 'framer-motion';
-import { Activity, Zap } from 'lucide-react';
+import { Activity, Zap, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const velocityData = [
   { name: 'Mon', speed: 40 },
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [recentPRs, setRecentPRs] = useState<any[]>([]);
+  const [latestReleaseRepo, setLatestReleaseRepo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +36,8 @@ export default function DashboardPage() {
       try {
         const [statsRes, activeRes] = await Promise.all([
           apiClient.dashboard.stats(),
-          apiClient.dashboard.recentActivity()
+          apiClient.dashboard.recentActivity(),
+          apiClient.repos.list()
         ]);
 
         if (!statsRes.success && statsRes.error?.code === 'HTTP_401') {
@@ -47,6 +50,15 @@ export default function DashboardPage() {
         }
         if (activeRes.success) {
           setRecentPRs(activeRes.data || []);
+        }
+
+        // Find repo with latest release info
+        // The third item in the Promise.all result is the repos list
+        const reposRes = await apiClient.repos.list(); // Re-calling just to be safe with types, or cast from array above
+        if (reposRes.success && reposRes.data && reposRes.data.length > 0) {
+          // Prefer one with a changelog
+          const repoWithChangelog = reposRes.data.find((r: any) => r.release_changelog);
+          setLatestReleaseRepo(repoWithChangelog || reposRes.data[0]);
         }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
@@ -126,31 +138,41 @@ export default function DashboardPage() {
           <Card className="h-full border-none shadow-lg bg-card/50 backdrop-blur-sm ring-1 ring-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-500" />
-                Engineering Velocity (AI Analysis)
+                <FileText className="h-5 w-5 text-primary" />
+                Last Release Summary
               </CardTitle>
-              <CardDescription>Code output trend over the last 7 days</CardDescription>
+              <CardDescription>
+                {latestReleaseRepo ? `Latest updates from ${latestReleaseRepo.name}` : 'No release data available'}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="pl-2">
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={velocityData}>
-                    <defs>
-                      <linearGradient id="colorSpeed" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="name" fontSize={12} stroke="#888888" axisLine={false} tickLine={false} />
-                    <YAxis fontSize={12} stroke="#888888" axisLine={false} tickLine={false} />
-                    <RechartsTooltip
-                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff' }}
-                    />
-                    <Area type="monotone" dataKey="speed" stroke="#0ea5e9" strokeWidth={2} fillOpacity={1} fill="url(#colorSpeed)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+            <CardContent>
+              {(() => {
+                let summary = "";
+                try {
+                  if (latestReleaseRepo?.release_risk_analysis) {
+                    const analysis = JSON.parse(latestReleaseRepo.release_risk_analysis);
+                    summary = analysis.summary;
+                  }
+                } catch (e) {
+                  console.log("Failed to parse release analysis JSON", e);
+                }
+
+                const displayContent = summary || latestReleaseRepo?.release_changelog;
+
+                return displayContent ? (
+                  <div className="h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                      <ReactMarkdown>
+                        {displayContent}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+                    No release changelogs found. Run a release analysis in the Releases page.
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </motion.div>

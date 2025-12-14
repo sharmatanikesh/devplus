@@ -52,6 +52,11 @@ export const NAVIGATION_ITEMS = [
     icon: 'GitBranch',
   },
   {
+    title: 'Releases',
+    href: '/releases',
+    icon: 'Package',
+  },
+  {
     title: 'Metrics',
     href: '/metrics',
     icon: 'BarChart3',

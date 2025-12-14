@@ -691,3 +691,206 @@ func (c *GithubController) HandleRepoAIWebhook(w http.ResponseWriter, r *http.Re
 	
 	w.WriteHeader(http.StatusOK)
 }
+
+// GetPullRequestsByRepoID returns all pull requests for a repository
+func (c *GithubController) GetPullRequestsByRepoID(w http.ResponseWriter, r *http.Request) {
+	// Get User ID from context
+	_, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// Get repository ID from path
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	// Get all PRs for the repository
+	prs, err := c.service.GetPullRequestsByRepoID(r.Context(), repoID)
+	if err != nil {
+		log.Error().Err(err).Str("repo_id", repoID).Msg("Failed to fetch pull requests")
+		http.Error(w, "Failed to fetch pull requests", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prs)
+}
+
+// CalculateReleaseRisk triggers AI analysis for release risk calculation
+func (c *GithubController) CalculateReleaseRisk(w http.ResponseWriter, r *http.Request) {
+	// Get User ID from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// Get repository ID from path
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	// Parse request body to get selected PR IDs
+	var requestBody struct {
+		PRIDs []string `json:"pr_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		log.Error().Err(err).Msg("Failed to decode request body")
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(requestBody.PRIDs) == 0 {
+		http.Error(w, "No pull requests selected", http.StatusBadRequest)
+		return
+	}
+
+	// Get all PRs for the repository
+	allPRs, err := c.service.GetPullRequestsByRepoID(r.Context(), repoID)
+	if err != nil {
+		log.Error().Err(err).Str("repo_id", repoID).Msg("Failed to fetch pull requests")
+		http.Error(w, "Failed to fetch pull requests", http.StatusInternalServerError)
+		return
+	}
+
+	// Filter PRs based on selected IDs
+	prMap := make(map[string]*models.PullRequest)
+	for _, pr := range allPRs {
+		prMap[pr.ID] = pr
+	}
+
+	var selectedPRs []*models.PullRequest
+	for _, prID := range requestBody.PRIDs {
+		if pr, exists := prMap[prID]; exists {
+			selectedPRs = append(selectedPRs, pr)
+		}
+	}
+
+	if len(selectedPRs) == 0 {
+		http.Error(w, "No valid pull requests found from selection", http.StatusBadRequest)
+		return
+	}
+
+	// Get repository details
+	repo, err := c.service.GetRepository(r.Context(), userVal.ID, repoID)
+	if err != nil {
+		log.Error().Err(err).Str("repo_id", repoID).Msg("Failed to fetch repository")
+		http.Error(w, "Failed to fetch repository", http.StatusNotFound)
+		return
+	}
+
+	// Format PR data for AI (only selected PRs)
+	var prData strings.Builder
+	for i, pr := range selectedPRs {
+		title := ""
+		if pr.Title != nil {
+			title = *pr.Title
+		}
+		prData.WriteString(fmt.Sprintf("\n### PR #%d: %s\n", i+1, title))
+		
+		if pr.Number != nil {
+			prData.WriteString(fmt.Sprintf("- **PR Number**: %d\n", *pr.Number))
+		}
+		if pr.State != nil {
+			prData.WriteString(fmt.Sprintf("- **State**: %s\n", *pr.State))
+		}
+		if pr.AuthorName != nil {
+			prData.WriteString(fmt.Sprintf("- **Author**: %s\n", *pr.AuthorName))
+		}
+		if pr.AISummary != nil && *pr.AISummary != "" {
+			prData.WriteString(fmt.Sprintf("- **AI Analysis**: %s\n", *pr.AISummary))
+		}
+		prData.WriteString("\n")
+	}
+
+	// Trigger Kestra workflow
+	if err := c.service.TriggerReleaseRiskAnalysis(r.Context(), repoID, repo.Owner, repo.Name, prData.String()); err != nil {
+		log.Error().Err(err).Str("repo_id", repoID).Msg("Failed to trigger release risk analysis")
+		http.Error(w, "Failed to trigger release risk analysis", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "analyzing",
+		"message": "Release risk analysis started for selected PRs",
+	})
+}
+
+// HandleReleaseRiskCallback handles the callback from Kestra with release risk analysis results
+func (c *GithubController) HandleReleaseRiskCallback(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		RepositoryID string `json:"repository_id"`
+		RawAnalysis  string `json:"raw_analysis"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Error().Err(err).Msg("[HandleReleaseRiskCallback] Failed to decode JSON")
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	if payload.RepositoryID == "" {
+		log.Error().Msg("[HandleReleaseRiskCallback] repository_id is missing")
+		http.Error(w, "repository_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if payload.RawAnalysis == "" {
+		log.Error().Msg("[HandleReleaseRiskCallback] raw_analysis is missing")
+		http.Error(w, "raw_analysis is required", http.StatusBadRequest)
+		return
+	}
+
+	// Strip markdown code block markers if present
+	payload.RawAnalysis = strings.TrimSpace(payload.RawAnalysis)
+	
+	fencePattern := regexp.MustCompile(`(?si)^\s*` + "`" + "`" + "`" + `[A-Za-z0-9_-]*\s*(.*?)\s*` + "`" + "`" + "`" + `(?:\s*)?$`)
+	if matches := fencePattern.FindStringSubmatch(payload.RawAnalysis); len(matches) > 1 {
+		payload.RawAnalysis = strings.TrimSpace(matches[1])
+	} else {
+		payload.RawAnalysis = strings.TrimPrefix(payload.RawAnalysis, "```")
+		payload.RawAnalysis = strings.TrimSuffix(payload.RawAnalysis, "```")
+		payload.RawAnalysis = strings.TrimSpace(payload.RawAnalysis)
+	}
+
+	// Parse the JSON response from AI
+	var analysisResult struct {
+		Changelog string `json:"changelog"`
+		RiskScore int    `json:"risk_score"`
+		Summary   string `json:"summary"`
+	}
+
+	if err := json.Unmarshal([]byte(payload.RawAnalysis), &analysisResult); err != nil {
+		log.Error().Err(err).Str("raw_analysis", payload.RawAnalysis).Msg("[HandleReleaseRiskCallback] Failed to parse AI response")
+		http.Error(w, "Failed to parse AI response", http.StatusBadRequest)
+		return
+	}
+
+	// Update repository with release risk analysis
+	ctx := context.Background()
+	if err := c.service.UpdateReleaseRiskAnalysis(ctx, payload.RepositoryID, analysisResult.RiskScore, analysisResult.Changelog, payload.RawAnalysis); err != nil {
+		log.Error().Err(err).Msg("[HandleReleaseRiskCallback] Failed to update release risk analysis")
+		http.Error(w, "Failed to update analysis: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Notify all connected SSE clients
+	notificationData := map[string]interface{}{
+		"status":                "completed",
+		"release_risk_score":    analysisResult.RiskScore,
+		"release_changelog":     analysisResult.Changelog,
+		"release_risk_analysis": payload.RawAnalysis,
+		"repo_id":               payload.RepositoryID,
+	}
+	notificationJSON, _ := json.Marshal(notificationData)
+	GlobalSSEManager.NotifyClients(payload.RepositoryID, FormatSSEMessage(string(notificationJSON)))
+
+	log.Info().
+		Str("repository_id", payload.RepositoryID).
+		Int("risk_score", analysisResult.RiskScore).
+		Msg("[HandleReleaseRiskCallback] Release risk analysis completed")
+
+	w.WriteHeader(http.StatusOK)
+}

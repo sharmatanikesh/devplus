@@ -1,22 +1,56 @@
-# Kestra Setup for Google Cloud Run
+# Kestra - AI Workflow Engine
 
-This repository contains a Dockerfile to run [Kestra](https://kestra.io/) on Google Cloud Run.
+This directory contains the setup for [Kestra](https://kestra.io/), the AI workflow orchestration engine that powers DevPlus's intelligent PR analysis, release notes generation, and risk assessment.
+
+## What is Kestra?
+
+Kestra is an open-source orchestration platform that manages AI workflows in DevPlus. The workflows defined in `../backend/workflows/` are executed by Kestra to provide:
+
+- AI-powered pull request analysis
+- Automated release notes generation
+- Release risk assessment
+- Repository analysis
 
 ## Prerequisites
 
 - Docker installed locally
-- Google Cloud SDK (`gcloud`) installed (for Cloud Run deployment)
-- A Google Cloud project with billing enabled
+- (Optional) Google Cloud SDK (`gcloud`) for cloud deployment
 
 ## Local Development
 
-### 1. Build the Docker Image
+### Quick Start
+
+Run Kestra using the official Docker image:
+
+```bash
+docker run -d \
+  --name kestra \
+  -p 8080:8080 \
+  -v $(pwd)/storage:/app/storage \
+  kestra/kestra:latest
+```
+
+Or using PowerShell on Windows:
+
+```powershell
+docker run -d `
+  --name kestra `
+  -p 8080:8080 `
+  -v ${PWD}/storage:/app/storage `
+  kestra/kestra:latest
+```
+
+### Using Custom Dockerfile
+
+If you need custom configurations:
+
+1. **Build the Docker Image**
 
 ```bash
 docker build -t kestra-local .
 ```
 
-### 2. Run Locally
+2. **Run the Container**
 
 ```bash
 docker run -d \
@@ -26,21 +60,90 @@ docker run -d \
   kestra-local
 ```
 
-### 3. Access Kestra
+### Access Kestra UI
 
 Open your browser and navigate to:
+
 ```
 http://localhost:8080
 ```
 
-### 4. Stop the Container
+Default credentials (if authentication is enabled):
+
+- Username: `admin`
+- Password: `kestra`
+
+### Uploading Workflows
+
+The DevPlus Kestra workflows are located in `../backend/workflows/`:
+
+- `ai-pull-request-analysis.yaml` - AI PR review workflow
+- `ai-release-risk.yaml` - Release risk assessment
+- `ai-repo-analysis.yaml` - Repository analysis
+
+Upload these workflows through the Kestra UI or use the Kestra CLI.
+
+### Managing the Container
+
+**Stop the container:**
+
+```bash
+docker stop kestra
+```
+
+**Start the container:**
+
+```bash
+docker start kestra
+```
+
+**Remove the container:**
 
 ```bash
 docker stop kestra
 docker rm kestra
 ```
 
-## Deploy to Google Cloud Run
+**View logs:**
+
+```bash
+docker logs kestra -f
+```
+
+## Environment Variables
+
+Configure Kestra using environment variables:
+
+```bash
+docker run -d \
+  --name kestra \
+  -p 8080:8080 \
+  -e KESTRA_CONFIGURATION=/app/application.yaml \
+  -e MICRONAUT_ENVIRONMENTS=dev \
+  kestra/kestra:latest
+```
+
+Common environment variables:
+
+- `KESTRA_CONFIGURATION` - Path to custom configuration file
+- `MICRONAUT_ENVIRONMENTS` - Environment (dev, prod)
+- `KESTRA_ENCRYPTION_SECRET_KEY` - Secret key for encryption
+
+See [.env.example](./.env.example) for more configuration options.
+
+## Integration with DevPlus
+
+Kestra integrates with the DevPlus backend through webhooks. The backend triggers workflows and receives callbacks:
+
+1. Backend triggers workflow: `POST http://localhost:8080/api/v1/executions/{namespace}/{flowId}`
+2. Kestra executes AI workflow
+3. Kestra calls back to backend: `POST {BACKEND_URL}/api/v1/webhook/ai`
+
+Configure the backend URL in your workflow YAML files.
+
+## Production Deployment
+
+### Deploy to Google Cloud Run
 
 ### Option 1: Using Cloud Build (Recommended)
 
@@ -138,40 +241,62 @@ gcloud run deploy $SERVICE_NAME \
   --cpu 4
 ```
 
-## Monitoring
-
-### View Logs
-
-```bash
-gcloud run services logs read $SERVICE_NAME --region $REGION
-```
-
-### Check Service Status
-
-```bash
-gcloud run services describe $SERVICE_NAME --region $REGION
-```
-
 ## Troubleshooting
 
-### Container Won't Start
+### Common Issues
 
-Check the logs:
+**Container won't start:**
+
 ```bash
-gcloud run services logs tail $SERVICE_NAME --region $REGION
+# Check logs
+docker logs kestra
+
+# Verify port is not in use
+netstat -an | grep 8080  # Linux/Mac
+netstat -an | findstr 8080  # Windows
 ```
 
-### Health Check Failures
+**Cannot access UI:**
 
+- Ensure Docker container is running: `docker ps | grep kestra`
+- Verify port mapping: `docker port kestra`
+- Check firewall settings
+
+**Workflow execution fails:**
+
+- Check workflow YAML syntax in Kestra UI
+- Verify backend API is accessible from Kestra
+- Review execution logs in Kestra UI
+
+### Cloud Run Issues
+
+**Health check failures:**
 The Dockerfile includes a health check at `/health`. Ensure Kestra is responding on port 8080.
 
-### Permission Issues
-
-Cloud Run runs containers as non-root by default, but this Dockerfile uses `USER root` for Kestra compatibility. If you encounter permission issues, verify the USER directive in the Dockerfile.
+**Permission issues:**
+Cloud Run runs containers as non-root by default, but this Dockerfile uses `USER root` for Kestra compatibility.
 
 ## Useful Commands
 
-### Update Service
+### Local Docker Commands
+
+```bash
+# View container stats
+docker stats kestra
+
+# Execute command in container
+docker exec -it kestra sh
+
+# Restart container
+docker restart kestra
+
+# Pull latest Kestra image
+docker pull kestra/kestra:latest
+```
+
+### Cloud Run Commands
+
+**Update service:**
 
 ```bash
 gcloud run services update $SERVICE_NAME \
@@ -179,13 +304,13 @@ gcloud run services update $SERVICE_NAME \
   --memory 4Gi
 ```
 
-### Delete Service
+**Delete service:**
 
 ```bash
 gcloud run services delete $SERVICE_NAME --region $REGION
 ```
 
-### List All Services
+**List all services:**
 
 ```bash
 gcloud run services list
@@ -194,5 +319,7 @@ gcloud run services list
 ## Additional Resources
 
 - [Kestra Documentation](https://kestra.io/docs)
-- [Google Cloud Run Documentation](https://cloud.google.com/run/docs)
 - [Kestra Docker Hub](https://hub.docker.com/r/kestra/kestra)
+- [DevPlus Backend README](../backend/README.md) - Integration details
+- [DevPlus Workflows](../backend/workflows/) - Workflow definitions
+- [Google Cloud Run Documentation](https://cloud.google.com/run/docs) - For cloud deployment
