@@ -233,7 +233,7 @@ export default function PullRequestDetailsPage() {
                             </Badge>
                         </div>
                         <p className="text-muted-foreground">
-                            Opened by <span className="font-medium text-foreground">{pr.author?.username}</span> on {new Date(pr.createdAt).toLocaleDateString()}
+                            Opened by <span className="font-medium text-foreground">{pr.author?.username || pr.author_name || 'unknown'}</span> on {new Date(pr.createdAt || pr.created_at || new Date()).toLocaleDateString()}
                         </p>
                     </div>
 

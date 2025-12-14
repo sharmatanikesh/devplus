@@ -173,6 +173,13 @@ export default function RepositoryDetailsPage() {
                     </div>
                     <div className="flex gap-2">
                         <Button
+                            variant="outline"
+                            onClick={() => document.getElementById('prs-section')?.scrollIntoView({ behavior: 'smooth' })}
+                            className="hover:bg-sky-50 dark:hover:bg-sky-900/20 border-sky-200 dark:border-sky-800"
+                        >
+                            <GitPullRequest className="mr-2 h-4 w-4" /> View PRs
+                        </Button>
+                        <Button
                             variant="default"
                             onClick={handleAnalyze}
                             disabled={analyzing}
@@ -250,7 +257,7 @@ export default function RepositoryDetailsPage() {
             )}
 
             {/* PR Section */}
-            <div className="space-y-4 pt-4">
+            <div id="prs-section" className="space-y-4 pt-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <GitPullRequest className="h-5 w-5 text-sky-500" /> Pull Requests
@@ -313,11 +320,11 @@ export default function RepositoryDetailsPage() {
                                                         pr.state === 'merged' ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]' :
                                                             'bg-red-500'
                                                 )} />
-                                                {pr.state} • by <span className="text-foreground font-medium">{pr.author?.username || 'unknown'}</span>
+                                                {pr.state} • by <span className="text-foreground font-medium">{pr.author?.username || pr.author_name || 'unknown'}</span>
                                             </div>
                                         </div>
                                         <div className="text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-1 rounded">
-                                            {new Date(pr.createdAt).toLocaleDateString()}
+                                            {new Date(pr.createdAt || pr.created_at || new Date()).toLocaleDateString()}
                                         </div>
                                     </div>
                                 </Link>

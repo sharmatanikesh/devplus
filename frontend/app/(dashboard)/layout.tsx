@@ -92,7 +92,7 @@ export default function DashboardLayout({
           scrolled ? "bg-background/80 backdrop-blur-md border-border/50 shadow-sm" : "bg-transparent"
         )}
       >
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="w-full max-w-[2000px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
             <motion.div
@@ -146,7 +146,7 @@ export default function DashboardLayout({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-transparent hover:ring-sky-200 transition-all p-0 overflow-hidden">
-                  <Avatar className="h-9 w-9">
+                  <Avatar className="h-9 w-9 cursor-pointer">
                     <AvatarImage src={user?.avatarUrl || "https://github.com/github.png"} />
                     <AvatarFallback className="bg-sky-100 text-sky-700">{user?.username?.substring(0, 2).toUpperCase() || "DV"}</AvatarFallback>
                   </Avatar>
@@ -175,7 +175,7 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <main className="flex-1 pt-16">
-        <div className="container mx-auto p-6">
+        <div className="w-full max-w-[2000px] mx-auto p-6 md:p-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -191,7 +191,7 @@ export default function DashboardLayout({
       </main>
 
       <footer className="py-6 border-t border-border/50 bg-background/50 backdrop-blur-sm">
-        <div className="container mx-auto px-6 grid gap-4 md:grid-cols-3 items-center">
+        <div className="w-full max-w-[2000px] mx-auto px-6 md:px-8 grid gap-4 md:grid-cols-3 items-center">
           {/* Empty left column for balance */}
           <div className="hidden md:block" />
 
@@ -200,7 +200,7 @@ export default function DashboardLayout({
             <span className="font-bold text-sky-500 animate-pulse">DevPulse</span>
             <span className="hidden md:inline">•</span>
             <p className="flex items-center gap-1">
-              Made with <Heart className="h-3 w-3 text-red-500 fill-red-500 animate-pulse" /> from team Shaitan
+              Made with <Heart className="h-3 w-3 text-red-500 fill-red-500 animate-pulse" /> from team ShaiTan
             </p>
           </div>
 
@@ -212,7 +212,7 @@ export default function DashboardLayout({
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-xs text-muted-foreground hover:text-sky-600 transition-colors"
             >
-              <Github className="h-4 w-4" />
+              <Github className="h-4 w-4 cursor-pointer hover:scale-110 transition-transform" />
               See code
             </a>
           </div>

@@ -109,37 +109,44 @@ export default function RepositoriesPage() {
                 Edit List
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-md max-h-[80vh] flex flex-col bg-card/90 backdrop-blur-xl border-sky-100 dark:border-sky-900/50 sm:rounded-2xl shadow-2xl">
               <DialogHeader>
-                <DialogTitle>Edit Repository List</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-sky-600 to-indigo-600 dark:from-sky-400 dark:to-indigo-400">Edit Repository List</DialogTitle>
+                <DialogDescription className="text-muted-foreground/80">
                   Select which repositories to display on your dashboard.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                <div className="flex items-center space-x-2 py-2 border-b">
+              <div className="flex-1 overflow-y-auto space-y-4 pr-2 -mr-2 my-2 custom-scrollbar">
+                <div className="flex items-center space-x-3 py-3 px-3 rounded-lg bg-sky-50/50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-900/30">
                   <Checkbox
                     id="select-all"
                     checked={selectedRepoIds.length === repositories.length && repositories.length > 0}
                     onCheckedChange={handleToggleSelectAll}
+                    className="data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
                   />
-                  <Label htmlFor="select-all" className="font-semibold cursor-pointer">
+                  <Label htmlFor="select-all" className="font-semibold cursor-pointer text-sky-900 dark:text-sky-100 flex-1">
                     Select All ({selectedRepoIds.length}/{repositories.length})
                   </Label>
                 </div>
-                {repositories.map((repo) => (
-                  <div key={repo.id} className="flex items-center space-x-2 py-2">
-                    <Checkbox
-                      id={repo.id}
-                      checked={selectedRepoIds.includes(repo.id)}
-                      onCheckedChange={() => handleToggleRepo(repo.id)}
-                    />
-                    <Label htmlFor={repo.id} className="flex-1 cursor-pointer">
-                      <div className="font-medium">{repo.name}</div>
-                      <div className="text-xs text-muted-foreground">{repo.owner}</div>
-                    </Label>
-                  </div>
-                ))}
+                <div className="space-y-1">
+                  {repositories.map((repo) => (
+                    <div
+                      key={repo.id}
+                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group border border-transparent hover:border-border/50"
+                    >
+                      <Checkbox
+                        id={repo.id}
+                        checked={selectedRepoIds.includes(repo.id)}
+                        onCheckedChange={() => handleToggleRepo(repo.id)}
+                        className="data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
+                      />
+                      <Label htmlFor={repo.id} className="flex-1 cursor-pointer">
+                        <div className="font-medium group-hover:text-sky-600 transition-colors">{repo.name}</div>
+                        <div className="text-xs text-muted-foreground">{repo.owner}</div>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </DialogContent>
           </Dialog>

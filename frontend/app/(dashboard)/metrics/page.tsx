@@ -202,10 +202,12 @@ export default function MetricsPage() {
       {/* Tabs for Different Views */}
       <motion.div variants={item}>
         <Tabs defaultValue="languages" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1 border border-border/50">
-            <TabsTrigger value="languages" className="data-[state=active]:bg-background data-[state=active]:text-sky-600 data-[state=active]:shadow-sm">Languages</TabsTrigger>
-            <TabsTrigger value="top-repos" className="data-[state=active]:bg-background data-[state=active]:text-sky-600 data-[state=active]:shadow-sm">Top Repos</TabsTrigger>
-          </TabsList>
+          <div className="flex justify-center w-full">
+            <TabsList className="bg-muted/50 p-1 border border-border/50">
+              <TabsTrigger value="languages" className="w-[150px] data-[state=active]:bg-background data-[state=active]:text-sky-600 data-[state=active]:shadow-sm">Languages</TabsTrigger>
+              <TabsTrigger value="top-repos" className="w-[150px] data-[state=active]:bg-background data-[state=active]:text-sky-600 data-[state=active]:shadow-sm">Top Repos</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Languages Tab */}
           <TabsContent value="languages" className="space-y-4">
@@ -292,7 +294,7 @@ export default function MetricsPage() {
                 <CardDescription>Most impactful repositories</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                   {metrics.top_repos.slice(0, 6).map((repo, index) => (
                     <RepoTiltCard key={`${repo.owner}/${repo.name}`} repo={repo} index={index} />
                   ))}

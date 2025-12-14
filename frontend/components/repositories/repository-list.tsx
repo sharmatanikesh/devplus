@@ -30,7 +30,7 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
     }
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {repositories.map((repo) => (
                 <Card key={repo.id} className="flex flex-col hover:shadow-xl hover:scale-[1.01] transition-all duration-200 border-border/50 bg-card/50 hover:border-sky-200 dark:hover:border-sky-800">
                     <CardHeader>

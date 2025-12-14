@@ -46,10 +46,11 @@ export interface PullRequest {
   title: string;
   description?: string;
   state: "open" | "closed" | "merged";
-  author: {
+  author?: {
     username: string;
     avatarUrl: string;
   };
+  author_name?: string; // From DB
   baseBranch: string;
   headBranch: string;
   url: string;
@@ -62,7 +63,8 @@ export interface PullRequest {
   ai_summary?: string;  // Changed from aiSummary to match backend
   ai_decision?: "approve" | "request_changes" | "block";  // Changed from aiDecision to match backend
   aiComments?: AIComment[];
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string; // From DB
   updatedAt: string;
   mergedAt?: string;
   closedAt?: string;

@@ -174,7 +174,12 @@ export default function DashboardPage() {
                       <p className="text-xs text-muted-foreground">{new Date(pr.created_at).toLocaleDateString()} in {pr.repository?.name}</p>
                     </div>
                     <div className="ml-auto">
-                      <Badge variant="secondary" className={pr.state === 'open' ? 'bg-sky-100 text-sky-800' : 'bg-green-100 text-green-800'}>
+                      <Badge variant="secondary" className={cn(
+                        "capitalize",
+                        pr.state === 'merged' && "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+                        pr.state === 'closed' && "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+                        pr.state === 'open' && "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                      )}>
                         {pr.state}
                       </Badge>
                     </div>

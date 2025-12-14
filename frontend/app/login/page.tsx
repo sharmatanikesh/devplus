@@ -142,7 +142,7 @@ export default function LoginPage() {
             {/* Subtle top gradient border effect */}
             <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-sky-500/50 to-transparent opacity-50" />
 
-            <CardHeader className="space-y-2 pb-8 text-center sm:text-left">
+            <CardHeader className="space-y-2 pb-8 text-center">
               <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
               <CardDescription className="text-base">
                 Sign in to your dashboard to continue
