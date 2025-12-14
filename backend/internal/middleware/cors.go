@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 )
 
@@ -12,6 +13,11 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		allowedOrigin := os.Getenv("FRONTEND_URL")
 		if allowedOrigin == "" {
 			allowedOrigin = "http://localhost:3000"
+		}
+
+		// Parse URL to get just the origin (scheme + host)
+		if parsedURL, err := url.Parse(allowedOrigin); err == nil {
+			allowedOrigin = parsedURL.Scheme + "://" + parsedURL.Host
 		}
 
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
