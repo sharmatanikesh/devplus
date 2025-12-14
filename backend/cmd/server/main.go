@@ -48,7 +48,7 @@ func main() {
 	r := router.SetupRouter(authController, githubController)
 
 	// Start Server
-	addr := ":" + cfg.Port
+	addr := ":" + cfg.BACKEND_PORT
 	server := &http.Server{
 		Addr:    addr,
 		Handler: r,

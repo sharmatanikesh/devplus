@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	Port                string
+	BACKEND_PORT                string
 	DBHost              string
 	DBUser              string
 	DBPassword          string
@@ -31,7 +31,7 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		Port:                getEnv("PORT", "8081"),
+		BACKEND_PORT:                getEnv("PORT", "8081"),
 		DBHost:              getEnv("DB_HOST", "localhost"),
 		DBUser:              getEnv("DB_USER", "postgres"),
 		DBPassword:          getEnv("DB_PASSWORD", "postgres"),
