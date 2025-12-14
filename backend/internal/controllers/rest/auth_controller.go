@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -43,19 +44,11 @@ func (c *AuthController) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set Session Cookie
-	http.SetCookie(w, &http.Cookie{
-    Name:     "session_token",
-    Value:    session.ID,
-    Expires:  session.ExpiresAt,
-    HttpOnly: true,
-    Secure:   true, // MUST be true in production
-    Path:     "/",
-    SameSite: http.SameSiteNoneMode, // MUST be None for cross-site
-})
-
-	// Redirect to Frontend Dashboard
-	http.Redirect(w, r, c.service.Config.FrontendURL, http.StatusTemporaryRedirect)
+	// Return session token in URL for frontend to store
+	// This avoids all cross-origin cookie issues
+	frontendCallbackURL := fmt.Sprintf("%s/auth/callback?token=%s",
+		c.service.Config.FrontendURL, session.ID)
+	http.Redirect(w, r, frontendCallbackURL, http.StatusTemporaryRedirect)
 }
 
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
