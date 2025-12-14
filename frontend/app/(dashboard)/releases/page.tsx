@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,7 +48,7 @@ export default function ReleasesPage() {
     const sseUrl = baseUrl.endsWith('/api')
       ? `${baseUrl}/v1/repos/${selectedRepo.id}/analyze/stream`
       : `${baseUrl}/api/v1/repos/${selectedRepo.id}/analyze/stream`;
-    
+
     console.log('[SSE] Connecting to:', sseUrl);
 
     const eventSource = new EventSource(sseUrl, { withCredentials: true });
@@ -61,7 +62,7 @@ export default function ReleasesPage() {
       try {
         const data = JSON.parse(event.data);
         console.log('[SSE] Parsed data:', data);
-        
+
         // Update repository with release risk data if present
         if (data.release_risk_score !== undefined || data.release_changelog) {
           console.log('[SSE] Updating release risk data:', {
@@ -79,7 +80,7 @@ export default function ReleasesPage() {
           } : null);
 
           // Also update in repositories list
-          setRepositories(prev => prev.map(repo => 
+          setRepositories(prev => prev.map(repo =>
             repo.id === selectedRepo.id ? {
               ...repo,
               release_risk_score: data.release_risk_score ?? repo.release_risk_score,
@@ -209,31 +210,31 @@ export default function ReleasesPage() {
 
   const getRiskBadge = (score?: number) => {
     if (score === undefined || score === 0) return null;
-    
+
     if (score <= 30) {
       return (
-        <Badge variant="default" className="bg-green-500">
+        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
           <CheckCircle2 className="w-3 h-3 mr-1" />
           Low Risk ({score}/100)
         </Badge>
       );
     } else if (score <= 60) {
       return (
-        <Badge variant="default" className="bg-yellow-500">
+        <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/20">
           <AlertTriangle className="w-3 h-3 mr-1" />
           Medium Risk ({score}/100)
         </Badge>
       );
     } else if (score <= 85) {
       return (
-        <Badge variant="destructive">
+        <Badge variant="outline" className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/20">
           <AlertTriangle className="w-3 h-3 mr-1" />
           High Risk ({score}/100)
         </Badge>
       );
     } else {
       return (
-        <Badge variant="destructive" className="bg-red-700">
+        <Badge variant="destructive">
           <AlertTriangle className="w-3 h-3 mr-1" />
           Critical Risk ({score}/100)
         </Badge>
@@ -242,21 +243,21 @@ export default function ReleasesPage() {
   };
 
   const getRiskColor = (score?: number) => {
-    if (!score) return 'bg-gray-200';
-    if (score <= 30) return 'bg-green-500';
-    if (score <= 60) return 'bg-yellow-500';
+    if (!score) return 'bg-muted';
+    if (score <= 30) return 'bg-emerald-500';
+    if (score <= 60) return 'bg-amber-500';
     if (score <= 85) return 'bg-orange-500';
-    return 'bg-red-600';
+    return 'bg-destructive';
   };
 
   const getStateBadge = (state: string) => {
     const variants = {
-      open: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      closed: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-      merged: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      open: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+      closed: 'bg-muted text-muted-foreground border-border',
+      merged: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
     };
     return (
-      <Badge className={variants[state as keyof typeof variants] || variants.closed}>
+      <Badge variant="outline" className={variants[state as keyof typeof variants] || variants.closed}>
         {state}
       </Badge>
     );
@@ -316,6 +317,52 @@ export default function ReleasesPage() {
         </CardContent>
       </Card>
 
+      {/* Last Release Summary */}
+      {selectedRepo && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <RefreshCw className="w-4 h-4 text-primary" />
+              Last Release Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Try to parse the summary from the analysis JSON
+              let summary = "";
+              try {
+                if (selectedRepo.release_risk_analysis) {
+                  const analysis = JSON.parse(selectedRepo.release_risk_analysis);
+                  summary = analysis.summary;
+                }
+              } catch (e) {
+                // Fallback to changelog if parsing fails or valid JSON doesn't exist
+                console.log("Failed to parse release analysis JSON", e);
+              }
+
+              const displayContent = summary || selectedRepo.release_changelog;
+
+              return displayContent ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                  <div className="line-clamp-3">
+                    <ReactMarkdown>
+                      {displayContent}
+                    </ReactMarkdown>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Release Risk Score: <span className={cn("font-medium", getRiskColor(selectedRepo.release_risk_score).replace('bg-', 'text-'))}>{selectedRepo.release_risk_score ?? 'N/A'}/100</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No release summary available for this repository yet. Click "New Release" to generate one.
+                </p>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pull Requests List */}
       {selectedRepo && (
         <Card>
@@ -351,6 +398,7 @@ export default function ReleasesPage() {
                 <Button
                   onClick={handleNewRelease}
                   disabled={selectedPRIds.size === 0 || isCalculating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 shadow-sm transition-all"
                 >
                   {isCalculating ? (
                     <>
@@ -382,50 +430,61 @@ export default function ReleasesPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b">
+                <div className="flex items-center gap-2 pb-4 border-b">
                   <Checkbox
                     checked={selectedPRIds.size === pullRequests.length && pullRequests.length > 0}
                     onCheckedChange={handleSelectAll}
+                    id="select-all"
                   />
-                  <span className="text-sm font-medium">
+                  <label htmlFor="select-all" className="text-sm font-medium cursor-pointer select-none">
                     Select All ({selectedPRIds.size}/{pullRequests.length})
-                  </span>
+                  </label>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="w-20">#</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead className="w-24">State</TableHead>
-                      <TableHead className="w-32">Author</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pullRequests.map((pr) => (
-                      <TableRow key={pr.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedPRIds.has(pr.id)}
-                            onCheckedChange={() => handlePRToggle(pr.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          #{pr.number}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {pr.title}
-                        </TableCell>
-                        <TableCell>
-                          {getStateBadge(pr.state)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {pr.author_name || 'Unknown'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="flex flex-col gap-3">
+                  {pullRequests.map((pr) => (
+                    <div
+                      key={pr.id}
+                      className={`
+                        group relative flex flex-col gap-2 p-4 rounded-lg border transition-all duration-200
+                        ${selectedPRIds.has(pr.id)
+                          ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                          : 'bg-card hover:bg-muted/50 border-border hover:border-slate-300 dark:hover:border-slate-700'
+                        }
+                      `}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedPRIds.has(pr.id)}
+                          onCheckedChange={() => handlePRToggle(pr.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          {/* Row 1: Header Info */}
+                          <div className="flex items-center justify-between gap-4 mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                #{pr.number}
+                              </span>
+                              <h3 className="font-semibold text-base truncate" title={pr.title}>
+                                {pr.title}
+                              </h3>
+                              {getStateBadge(pr.state)}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
+                              <span>by</span>
+                              <span className="font-medium text-foreground">{pr.author_name || pr.author?.username || 'Unknown'}</span>
+                            </div>
+                          </div>
+
+                          {/* Row 2: Summary */}
+                          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                            {pr.ai_summary || pr.description || 'No summary available.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
@@ -468,7 +527,7 @@ export default function ReleasesPage() {
                       {selectedRepo.release_risk_score}/100
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${selectedRepo.release_risk_score}%` }}
@@ -488,19 +547,7 @@ export default function ReleasesPage() {
                   </div>
                 )}
 
-                {/* Raw Analysis (Collapsible) */}
-                {selectedRepo.release_risk_analysis && (
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                      View detailed analysis
-                    </summary>
-                    <div className="mt-3 p-4 bg-muted/30 rounded-lg border text-sm">
-                      <pre className="whitespace-pre-wrap break-words">
-                        {selectedRepo.release_risk_analysis}
-                      </pre>
-                    </div>
-                  </details>
-                )}
+
               </div>
             )}
           </CardContent>
@@ -508,15 +555,17 @@ export default function ReleasesPage() {
       )}
 
       {/* Info Card */}
-      <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+      <Card className="bg-muted/30 border-primary/20">
         <CardContent className="pt-6">
           <div className="flex gap-3">
-            <AlertTriangle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="p-2 bg-primary/10 rounded-full h-fit">
+              <AlertTriangle className="w-5 h-5 text-primary flex-shrink-0" />
+            </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              <p className="text-sm font-medium text-foreground">
                 How Release Management Works
               </p>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                 <li>Select a repository to view its pull requests</li>
                 <li>Choose specific PRs to include in the release</li>
                 <li>Click &quot;New Release&quot; to generate changelog and risk analysis</li>
