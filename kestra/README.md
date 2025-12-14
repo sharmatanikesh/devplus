@@ -1,10 +1,10 @@
 # Kestra - AI Workflow Engine
 
-This directory contains the setup for [Kestra](https://kestra.io/), the AI workflow orchestration engine that powers DevPlus's intelligent PR analysis, release notes generation, and risk assessment.
+This directory contains the setup for [Kestra](https://kestra.io/), the AI workflow orchestration engine that powers DevPulse's intelligent PR analysis, release notes generation, and risk assessment.
 
 ## What is Kestra?
 
-Kestra is an open-source orchestration platform that manages AI workflows in DevPlus. The workflows defined in `../backend/workflows/` are executed by Kestra to provide:
+Kestra is an open-source orchestration platform that manages AI workflows in DevPulse. The workflows defined in `../backend/workflows/` are executed by Kestra to provide:
 
 - AI-powered pull request analysis
 - Automated release notes generation
@@ -75,7 +75,7 @@ Default credentials (if authentication is enabled):
 
 ### Uploading Workflows
 
-The DevPlus Kestra workflows are located in `../backend/workflows/`:
+The DevPulse Kestra workflows are located in `../backend/workflows/`:
 
 - `ai-pull-request-analysis.yaml` - AI PR review workflow
 - `ai-release-risk.yaml` - Release risk assessment
@@ -131,9 +131,9 @@ Common environment variables:
 
 See [.env.example](./.env.example) for more configuration options.
 
-## Integration with DevPlus
+## Integration with DevPulse
 
-Kestra integrates with the DevPlus backend through webhooks. The backend triggers workflows and receives callbacks:
+Kestra integrates with the DevPulse backend through webhooks. The backend triggers workflows and receives callbacks:
 
 1. Backend triggers workflow: `POST http://localhost:8080/api/v1/executions/{namespace}/{flowId}`
 2. Kestra executes AI workflow
@@ -320,6 +320,6 @@ gcloud run services list
 
 - [Kestra Documentation](https://kestra.io/docs)
 - [Kestra Docker Hub](https://hub.docker.com/r/kestra/kestra)
-- [DevPlus Backend README](../backend/README.md) - Integration details
-- [DevPlus Workflows](../backend/workflows/) - Workflow definitions
+- [DevPulse Backend README](../backend/README.md) - Integration details
+- [DevPulse Workflows](../backend/workflows/) - Workflow definitions
 - [Google Cloud Run Documentation](https://cloud.google.com/run/docs) - For cloud deployment

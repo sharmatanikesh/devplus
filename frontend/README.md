@@ -1,4 +1,4 @@
-# DevPlus Frontend
+# DevPulse Frontend
 
 AI-Powered Engineering Intelligence platform for automated PR reviews, release notes generation, and engineering metrics.
 

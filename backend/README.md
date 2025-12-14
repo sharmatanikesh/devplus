@@ -1,6 +1,6 @@
-# DevPlus Backend
+# DevPulse Backend
 
-This is the backend service for **DevPlus**, an AI-powered engineering intelligence platform. It is built with **Go** and uses **PostgreSQL** for data persistence and **Kestra** for AI workflow orchestration.
+This is the backend service for **DevPulse**, an AI-powered engineering intelligence platform. It is built with **Go** and uses **PostgreSQL** for data persistence and **Kestra** for AI workflow orchestration.
 
 ## Features
 
