@@ -1,22 +1,24 @@
-# DevPulse Frontend
+# DevPlus Frontend
 
 AI-Powered Engineering Intelligence platform for automated PR reviews, release notes generation, and engineering metrics.
 
 ## Features
 
-- 🤖 **Automated PR Reviews** - AI analyzes pull requests and provides intelligent feedback
-- 📦 **Smart Release Notes** - Generate comprehensive changelogs automatically
-- 📊 **Engineering Metrics** - Track PR lead time, review latency, and team performance
-- 🔍 **Architecture Impact Analysis** - Identify hotspots and analyze code coupling
-- 🔗 **GitHub Integration** - Seamless OAuth and webhook integration
+- 🔐 **GitHub OAuth Authentication** - Secure login with GitHub
+- 📦 **Repository Management** - View and manage connected GitHub repositories
+- 🔄 **Pull Request Tracking** - Monitor pull requests with real-time sync
+- 📊 **Engineering Metrics Dashboard** - Track PR lead time, review latency, and team performance
+- 📝 **Release Notes Generation** - AI-powered release notes and changelogs
+- 🤖 **AI PR Analysis** - Intelligent pull request reviews powered by Kestra workflows
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router)
 - **UI Library**: ShadCN UI + Tailwind CSS
 - **Language**: TypeScript
-- **State Management**: React Hooks
-- **API**: RESTful API routes
+- **State Management**: Redux Toolkit
+- **Styling**: Tailwind CSS
+- **API Client**: Axios
 
 ## Getting Started
 
@@ -24,7 +26,7 @@ AI-Powered Engineering Intelligence platform for automated PR reviews, release n
 
 - Node.js 20+
 - npm or yarn
-- GitHub OAuth App credentials
+- Backend API running (see [Backend README](../backend/README.md))
 
 ### Installation
 
@@ -40,14 +42,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` and add your GitHub OAuth credentials:
-
-```env
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-GITHUB_REDIRECT_URI=http://localhost:3000/api/v1/auth/github/callback
-NEXTAUTH_SECRET=your_random_secret_key
-```
+Edit `.env.local` with your configuration. See `.env.example` for all required variables.
 
 3. Run the development server:
 
@@ -61,67 +56,82 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 
 ```
 app/
-├── api/v1/                 # API Routes
-│   ├── auth/              # Authentication endpoints
-│   ├── repos/             # Repository management
-│   ├── metrics/           # Engineering metrics
-│   ├── impact/            # Impact analysis
-│   ├── webhook/           # GitHub webhooks
-│   └── health/            # Health check
-├── dashboard/             # Dashboard pages
-│   ├── layout.tsx         # Dashboard layout with sidebar
-│   ├── page.tsx           # Main dashboard
-│   ├── repositories/      # Repositories management
-│   ├── pull-requests/     # PR list and details
-│   ├── metrics/           # Metrics dashboard
-│   └── releases/          # Release notes
-├── login/                 # Authentication page
+├── (dashboard)/           # Dashboard routes (protected)
+│   ├── layout.tsx        # Dashboard layout with sidebar
+│   ├── dashboard/        # Main dashboard page
+│   ├── repositories/     # Repositories management
+│   ├── pull-requests/    # PR details pages
+│   ├── metrics/          # Metrics dashboard
+│   └── releases/         # Release notes
+├── login/                # Authentication page
+├── privacy/              # Privacy policy page
+├── terms/                # Terms of service page
+├── layout.tsx            # Root layout
+├── page.tsx              # Landing page
 └── globals.css           # Global styles
 
 components/
-└── ui/                    # ShadCN UI components
+├── dashboard/            # Dashboard-specific components
+├── repositories/         # Repository components
+└── ui/                   # ShadCN UI components
 
 lib/
-├── types/                 # TypeScript type definitions
-├── utils/                 # Utility functions
-├── constants.ts           # App constants
-└── api-client.ts          # API client wrapper
+├── api-client.ts         # API client wrapper
+├── constants.ts          # App constants
+├── utils.ts              # Utility functions
+├── store/                # Redux store configuration
+│   ├── index.ts          # Store setup
+│   ├── hooks.ts          # Redux hooks
+│   ├── StoreProvider.tsx # Redux provider
+│   └── slices/           # Redux slices
+├── types/                # TypeScript type definitions
+└── utils/                # Utility functions
+    ├── auth.ts           # Auth utilities
+    └── format.ts         # Formatting utilities
 ```
 
-## API Endpoints
+## API Integration
 
-### Authentication
+The frontend communicates with the backend API using axios. The base URL is configured via environment variables.
 
-- `POST /api/v1/auth/github/connect` - Start GitHub OAuth
-- `GET /api/v1/auth/github/callback` - OAuth callback
+### API Client Usage
 
-### Repositories
+```tsx
+import { apiClient } from "@/lib/api-client";
 
-- `GET /api/v1/repos` - List connected repositories
-- `POST /api/v1/repos/:id/sync` - Trigger repository sync
-- `GET /api/v1/repos/:id/prs` - List pull requests
-- `GET /api/v1/repos/:id/prs/:pr_number` - Get PR details
-- `POST /api/v1/repos/:id/prs/:pr_number/analyze` - Trigger AI analysis
-- `POST /api/v1/repos/:id/release` - Generate release notes
+// Example: Fetch repositories
+const response = await apiClient.repos.list();
+if (response.success && response.data) {
+  setRepositories(response.data);
+}
+```
 
-### Metrics & Analysis
+## Available Scripts
 
-- `GET /api/v1/metrics` - Get engineering metrics
-- `GET /api/v1/impact/:pr_id` - Get impact analysis
+```bash
+# Development
+npm run dev          # Start development server
 
-### System
+# Production
+npm run build        # Build for production
+npm start            # Start production server
 
-- `POST /api/v1/webhook/github` - GitHub webhook receiver
-- `GET /api/v1/health` - Health check
+# Code Quality
+npm run lint         # Run ESLint
+npm run type-check   # Run TypeScript type checking
+
+# Format
+npm run format       # Format code with Prettier
+```
 
 ## Development
 
 ### Adding New Pages
 
-Pages follow Next.js App Router conventions. Create files in `app/dashboard/`:
+Pages follow Next.js App Router conventions. Create files in `app/(dashboard)/`:
 
 ```tsx
-// app/dashboard/new-page/page.tsx
+// app/(dashboard)/new-page/page.tsx
 export default function NewPage() {
   return <div>New Page</div>;
 }
@@ -143,41 +153,22 @@ All types are defined in `lib/types/index.ts`. Import and use:
 import type { Repository, PullRequest } from "@/lib/types";
 ```
 
-## Production Deployment
-
-1. Build the application:
-
-```bash
-npm run build
-```
-
-2. Start production server:
-
-```bash
-npm start
-```
-
 ## Environment Variables
 
-| Variable               | Description                   | Required |
-| ---------------------- | ----------------------------- | -------- |
-| `GITHUB_CLIENT_ID`     | GitHub OAuth App Client ID    | Yes      |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Secret       | Yes      |
-| `GITHUB_REDIRECT_URI`  | OAuth callback URL            | Yes      |
-| `NEXTAUTH_SECRET`      | Secret for session encryption | Yes      |
-| `NEXTAUTH_URL`         | Application base URL          | Yes      |
-| `API_BASE_URL`         | Backend API URL (if separate) | No       |
+See `.env.example` for all required environment variables:
+
+- `NEXT_PUBLIC_API_URL` - Backend API base URL
+- Additional variables as needed for production deployment
 
 ## Contributing
 
-This is a hackathon MVP project. For production use, consider:
+When contributing to this project:
 
-1. Implementing proper authentication with NextAuth.js
-2. Adding database integration (PostgreSQL, MongoDB, etc.)
-3. Implementing proper error handling and logging
-4. Adding comprehensive testing
-5. Setting up CI/CD pipelines
-6. Implementing rate limiting and security measures
+1. Follow the existing code structure and conventions
+2. Use TypeScript types for all new code
+3. Add proper error handling
+4. Update documentation for new features
+5. Test your changes thoroughly
 
 ## License
 
