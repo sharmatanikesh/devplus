@@ -1,17 +1,11 @@
-# Use official Kestra image as base
+# Use the official Kestra image
 FROM kestra/kestra:latest
 
-# Switch to root for any customizations
-USER root
+# Cloud Run expects the service to listen on port 8080
+ENV MICRONAUT_SERVER_PORT=8080
 
-# Set working directory
-WORKDIR /app
-
-# Expose Kestra port
+# Expose the port (for local testing only)
 EXPOSE 8080
 
-# Set environment variables (can be overridden at runtime)
-ENV KESTRA_CONFIGURATION=""
-
-# Run Kestra server in standalone mode
-CMD ["server", "standalone"]
+# Start Kestra in local mode (simple mode without Kubernetes)
+CMD ["server", "local"]

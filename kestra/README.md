@@ -1,118 +1,198 @@
-# Kestra Deployment Configuration
+# Kestra Setup for Google Cloud Run
 
-This folder contains the infrastructure setup for deploying Kestra workflow engine to Google Cloud Run.
+This repository contains a Dockerfile to run [Kestra](https://kestra.io/) on Google Cloud Run.
 
-## Quick Deploy to Cloud Run
+## Prerequisites
 
-### Option 1: Build and Deploy with Docker
+- Docker installed locally
+- Google Cloud SDK (`gcloud`) installed (for Cloud Run deployment)
+- A Google Cloud project with billing enabled
 
-**Local build and test:**
+## Local Development
+
+### 1. Build the Docker Image
+
 ```bash
-cd /Users/tanikesh/Documents/devplus/kestra
-
-# Build the image
-docker build -t devplus-kestra .
-
-# Test locally
-docker run -p 8080:8080 --env-file .env devplus-kestra
-
-# Access Kestra UI at http://localhost:8080
+docker build -t kestra-local .
 ```
 
-**Deploy to Cloud Run:**
+### 2. Run Locally
+
 ```bash
-# Build and push to GCR
-gcloud builds submit --config cloudbuild.yaml
-
-# Or manually:
-docker build -t gcr.io/YOUR_PROJECT_ID/devplus-kestra .
-docker push gcr.io/YOUR_PROJECT_ID/devplus-kestra
-
-gcloud run deploy devplus-kestra \
-  --image gcr.io/YOUR_PROJECT_ID/devplus-kestra \
-  --region asia-south1 \
-  --port 8080 \
-  --allow-unauthenticated
+docker run -d \
+  --name kestra \
+  -p 8080:8080 \
+  -v $(pwd)/storage:/app/storage \
+  kestra-local
 ```
 
-### Option 2: Using Cloud Run Console
+### 3. Access Kestra
 
-1. Go to https://console.cloud.google.com/run
-2. Click **"Create Service"**
-3. Select **"Continuously deploy from a repository"**
-4. Connect GitHub repo
-5. Set build configuration:
-   - Dockerfile: `kestra/Dockerfile`
-   - Build context: `kestra`
-6. Service name: `devplus-kestra`
-7. Region: `asia-south1`
-8. Port: `8080`
-9. Click **"Create"**
+Open your browser and navigate to:
+```
+http://localhost:8080
+```
 
-### Option 3: Using Pre-built Image (Quickest)
-
-1. Go to https://console.cloud.google.com/run
-2. Click **"Create Service"**
-3. Select **"Deploy one revision from an existing container image"**
-4. Container image URL: `kestra/kestra:latest`
-5. Service name: `devplus-kestra`
-6. Region: `asia-south1`
-7. Port: `8080`
-8. CPU allocation: **CPU is always allocated**
-9. Min instances: `1` (keeps Kestra running)
-10. Max instances: `1`
-11. Authentication: Allow unauthenticated (or require auth for security)
-12. Click **"Create"**
-
-### Option 2: Using gcloud CLI
+### 4. Stop the Container
 
 ```bash
-gcloud run deploy devplus-kestra \
-  --image kestra/kestra:latest \
+docker stop kestra
+docker rm kestra
+```
+
+## Deploy to Google Cloud Run
+
+### Option 1: Using Cloud Build (Recommended)
+
+```bash
+# Set your project ID
+export PROJECT_ID=your-project-id
+export REGION=us-central1
+export SERVICE_NAME=kestra
+
+# Build and push to Google Container Registry
+gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE_NAME
+
+# Deploy to Cloud Run
+gcloud run deploy $SERVICE_NAME \
+  --image gcr.io/$PROJECT_ID/$SERVICE_NAME \
   --platform managed \
-  --region asia-south1 \
-  --port 8080 \
+  --region $REGION \
   --allow-unauthenticated \
-  --min-instances 1 \
-  --max-instances 1 \
-  --cpu-always-allocated \
-  --command "server" \
-  --args "standalone"
+  --port 8080 \
+  --memory 2Gi \
+  --cpu 2 \
+  --timeout 3600 \
+  --max-instances 10
 ```
 
-## Environment Variables
-
-Add these in Cloud Run Console → Variables & Secrets:
+### Option 2: Using Artifact Registry
 
 ```bash
-SECRET_GEMINI_API_KEY=QUl6YVN5QTZMWmF1T1AyYWdJYXpzZ1RGZ
+# Set your project ID
+export PROJECT_ID=your-project-id
+export REGION=us-central1
+export SERVICE_NAME=kestra
+export REPOSITORY=kestra-repo
+
+# Create Artifact Registry repository (one-time setup)
+gcloud artifacts repositories create $REPOSITORY \
+  --repository-format=docker \
+  --location=$REGION \
+  --description="Kestra Docker repository"
+
+# Configure Docker to use gcloud as credential helper
+gcloud auth configure-docker $REGION-docker.pkg.dev
+
+# Build and tag the image
+docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest .
+
+# Push to Artifact Registry
+docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest
+
+# Deploy to Cloud Run
+gcloud run deploy $SERVICE_NAME \
+  --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE_NAME:latest \
+  --platform managed \
+  --region $REGION \
+  --allow-unauthenticated \
+  --port 8080 \
+  --memory 2Gi \
+  --cpu 2 \
+  --timeout 3600 \
+  --max-instances 10
 ```
 
-## After Deployment
+## Configuration
 
-1. Cloud Run will give you a URL like:
+### Environment Variables
+
+You can add custom environment variables during deployment:
+
+```bash
+gcloud run deploy $SERVICE_NAME \
+  --image gcr.io/$PROJECT_ID/$SERVICE_NAME \
+  --set-env-vars "KESTRA_CONFIGURATION=/app/application.yaml" \
+  --set-env-vars "CUSTOM_VAR=value"
+```
+
+### Custom Configuration File
+
+If you need a custom `application.yaml`:
+
+1. Create your `application.yaml` file in this directory
+2. Update the Dockerfile to copy it:
+   ```dockerfile
+   COPY application.yaml /app/application.yaml
+   ENV KESTRA_CONFIGURATION=/app/application.yaml
    ```
-   https://devplus-kestra-XXXXX.asia-south1.run.app
-   ```
+3. Rebuild and redeploy
 
-2. Update your backend service environment variable:
-   ```bash
-   KESTRA_URL=https://devplus-kestra-XXXXX.asia-south1.run.app
-   ```
+### Resource Limits
 
-3. Access Kestra UI at the Cloud Run URL
+Adjust memory and CPU based on your workload:
 
-## Workflows
+```bash
+gcloud run deploy $SERVICE_NAME \
+  --memory 4Gi \
+  --cpu 4
+```
 
-Your workflow files are in `../backend/workflows/`:
-- `ai-pull-request-analysis.yaml`
-- `ai-repo-analysis.yaml`
+## Monitoring
 
-These will be accessible to Kestra once deployed.
+### View Logs
 
-## Cost
+```bash
+gcloud run services logs read $SERVICE_NAME --region $REGION
+```
 
-- **Always-on instance**: ~$10-15/month
-- **Auto-scaling**: Pay per request (cheaper for low usage)
+### Check Service Status
 
-Choose based on your workflow frequency.
+```bash
+gcloud run services describe $SERVICE_NAME --region $REGION
+```
+
+## Troubleshooting
+
+### Container Won't Start
+
+Check the logs:
+```bash
+gcloud run services logs tail $SERVICE_NAME --region $REGION
+```
+
+### Health Check Failures
+
+The Dockerfile includes a health check at `/health`. Ensure Kestra is responding on port 8080.
+
+### Permission Issues
+
+Cloud Run runs containers as non-root by default, but this Dockerfile uses `USER root` for Kestra compatibility. If you encounter permission issues, verify the USER directive in the Dockerfile.
+
+## Useful Commands
+
+### Update Service
+
+```bash
+gcloud run services update $SERVICE_NAME \
+  --region $REGION \
+  --memory 4Gi
+```
+
+### Delete Service
+
+```bash
+gcloud run services delete $SERVICE_NAME --region $REGION
+```
+
+### List All Services
+
+```bash
+gcloud run services list
+```
+
+## Additional Resources
+
+- [Kestra Documentation](https://kestra.io/docs)
+- [Google Cloud Run Documentation](https://cloud.google.com/run/docs)
+- [Kestra Docker Hub](https://hub.docker.com/r/kestra/kestra)
