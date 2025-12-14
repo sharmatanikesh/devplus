@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoadingPulse } from '@/components/ui/loading-pulse';
 
-export default function CallbackPage() {
+function CallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -43,5 +43,13 @@ export default function CallbackPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CallbackPage() {
+    return (
+        <Suspense fallback={<LoadingPulse />}>
+            <CallbackContent />
+        </Suspense>
     );
 }
