@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -205,6 +206,42 @@ func (c *GithubController) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stats)
 }
 
+func (c *GithubController) GetPersonalMetrics(w http.ResponseWriter, r *http.Request) {
+	// 1. Get User from context
+	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
+	if !ok {
+		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Get GitHub token from context
+	token, ok := r.Context().Value(middleware.GithubTokenContextKey).(string)
+	if !ok || token == "" {
+		http.Error(w, "GitHub token not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// 3. Get optional days parameter (default 90)
+	days := 90
+	if daysParam := r.URL.Query().Get("days"); daysParam != "" {
+		if parsedDays, err := strconv.Atoi(daysParam); err == nil && parsedDays > 0 && parsedDays <= 365 {
+			days = parsedDays
+		}
+	}
+
+	// 4. Call Service to fetch personal metrics from GitHub
+	metrics, err := c.service.GetPersonalMetrics(r.Context(), userVal.ID, token, userVal.Username, days)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to fetch personal metrics")
+		http.Error(w, "Failed to fetch personal metrics: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Return JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metrics)
+}
+
 func (c *GithubController) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 	// 1. Get User ID from context
 	userVal, ok := r.Context().Value(middleware.UserContextKey).(models.User)
@@ -395,21 +432,38 @@ func (c *GithubController) HandleAIWebhook(w http.ResponseWriter, r *http.Reques
 	}
 	
 	// Strip markdown code block markers if present
-	cleanedAnalysis := payload.RawAnalysis
-	if strings.HasPrefix(cleanedAnalysis, "```json") {
-		cleanedAnalysis = strings.TrimPrefix(cleanedAnalysis, "```json")
-		cleanedAnalysis = strings.TrimSuffix(cleanedAnalysis, "```")
-		cleanedAnalysis = strings.TrimSpace(cleanedAnalysis)
-	} else if strings.HasPrefix(cleanedAnalysis, "```") {
+	cleanedAnalysis := strings.TrimSpace(payload.RawAnalysis)
+	
+	// Try regex extraction for fenced code blocks
+	fencePattern := regexp.MustCompile(`(?si)^\s*` + "`" + "`" + "`" + `[A-Za-z0-9_-]*\s*(.*?)\s*` + "`" + "`" + "`" + `(?:\s*)?$`)
+	if matches := fencePattern.FindStringSubmatch(cleanedAnalysis); len(matches) > 1 {
+		cleanedAnalysis = strings.TrimSpace(matches[1])
+	} else {
+		// Fallback: remove any leading/trailing triple-backtick markers
 		cleanedAnalysis = strings.TrimPrefix(cleanedAnalysis, "```")
 		cleanedAnalysis = strings.TrimSuffix(cleanedAnalysis, "```")
 		cleanedAnalysis = strings.TrimSpace(cleanedAnalysis)
 	}
 	
-	if err := json.Unmarshal([]byte(cleanedAnalysis), &aiResponse); err != nil {
-		log.Error().Err(err).Str("raw_analysis", cleanedAnalysis).Msg("[HandleAIWebhook] Failed to parse AI response JSON")
-		http.Error(w, "Failed to parse AI response", http.StatusBadRequest)
-		return
+	// First attempt: Try to parse as-is (handles pretty-printed JSON)
+	err := json.Unmarshal([]byte(cleanedAnalysis), &aiResponse)
+	if err != nil {
+		// Second attempt: Try to unmarshal and re-marshal to fix any formatting issues
+		var rawJSON map[string]interface{}
+		if err2 := json.Unmarshal([]byte(cleanedAnalysis), &rawJSON); err2 == nil {
+			// Successfully parsed as generic JSON, now extract the fields
+			if summary, ok := rawJSON["summary"].(string); ok {
+				aiResponse.Summary = summary
+			}
+			if decision, ok := rawJSON["decision"].(string); ok {
+				aiResponse.Decision = decision
+			}
+			log.Info().Str("summary_length", fmt.Sprintf("%d", len(aiResponse.Summary))).Str("decision", aiResponse.Decision).Msg("[HandleAIWebhook] Parsed AI response using fallback method")
+		} else {
+			log.Error().Err(err).Err(err2).Str("raw_analysis_preview", cleanedAnalysis[:min(500, len(cleanedAnalysis))]).Msg("[HandleAIWebhook] Failed to parse AI response JSON")
+			http.Error(w, "Failed to parse AI response", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Update DB with parsed summary and decision
@@ -605,13 +659,14 @@ func (c *GithubController) HandleRepoAIWebhook(w http.ResponseWriter, r *http.Re
 	}
 
 	// Strip markdown code block markers if present
-	if strings.HasPrefix(payload.RawAnalysis, "```markdown") {
-		// Remove ```markdown from start and ``` from end
-		payload.RawAnalysis = strings.TrimPrefix(payload.RawAnalysis, "```markdown")
-		payload.RawAnalysis = strings.TrimSuffix(payload.RawAnalysis, "```")
-		payload.RawAnalysis = strings.TrimSpace(payload.RawAnalysis)
-	} else if strings.HasPrefix(payload.RawAnalysis, "```") {
-		// Handle generic code blocks
+	payload.RawAnalysis = strings.TrimSpace(payload.RawAnalysis)
+	
+	// Try regex extraction for fenced code blocks
+	fencePattern := regexp.MustCompile(`(?si)^\s*` + "`" + "`" + "`" + `[A-Za-z0-9_-]*\s*(.*?)\s*` + "`" + "`" + "`" + `(?:\s*)?$`)
+	if matches := fencePattern.FindStringSubmatch(payload.RawAnalysis); len(matches) > 1 {
+		payload.RawAnalysis = strings.TrimSpace(matches[1])
+	} else {
+		// Fallback: remove any leading/trailing triple-backtick markers
 		payload.RawAnalysis = strings.TrimPrefix(payload.RawAnalysis, "```")
 		payload.RawAnalysis = strings.TrimSuffix(payload.RawAnalysis, "```")
 		payload.RawAnalysis = strings.TrimSpace(payload.RawAnalysis)

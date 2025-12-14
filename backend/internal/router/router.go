@@ -67,6 +67,7 @@ func SetupRouter(authController *rest.AuthController, githubController *rest.Git
 
 	// Dashboard Routes
 	protected.HandleFunc("/metrics", githubController.GetMetrics).Methods("GET")
+	protected.HandleFunc("/metrics/personal", githubController.GetPersonalMetrics).Methods("GET")
 	protected.HandleFunc("/dashboard/stats", githubController.GetDashboardStats).Methods("GET")
 	protected.HandleFunc("/dashboard/recent-prs", githubController.GetRecentActivity).Methods("GET")
 

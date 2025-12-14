@@ -56,11 +56,6 @@ export const NAVIGATION_ITEMS = [
     href: '/metrics',
     icon: 'BarChart3',
   },
-  {
-    title: 'Release Notes',
-    href: '/releases',
-    icon: 'Package',
-  },
 ] as const;
 
 // PR Status Colors
