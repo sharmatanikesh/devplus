@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+
+  # Go Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devplus-backend
+    ports:
+      - "8081:8081"
+    environment:
+      # Server
+      PORT: 8081
+      BACKEND_URL: ${BACKEND_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      
+      # Database (Supabase)
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: ${DB_SSLMODE}
+      
+      # GitHub OAuth
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI}
+      
+      # Kestra
+      KESTRA_URL: http://kestra:8080
+      KESTRA_USERNAME: ${KESTRA_USERNAME}
+      KESTRA_PASSWORD: ${KESTRA_PASSWORD}
+      
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    env_file:
+      - .env
+    depends_on:
+      - kestra
+    networks:
+      - devplus-network
+    restart: unless-stopped
+
+  # Kestra Workflow Engine
+  kestra:
+    image: kestra/kestra:latest
+    container_name: devplus-kestra
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    command: server standalone
+    environment:
+      KESTRA_CONFIGURATION: |
+        kestra:
+          server:
+            basic-auth:
+              enabled: false
+          queue:
+            type: memory
+          repository:
+            type: memory
+          storage:
+            type: local
+            local:
+              base-path: /tmp/kestra
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+      - ./workflows:/app/workflows:ro
+    networks:
+      - devplus-network
+    restart: unless-stopped
+
+networks:
+  devplus-network:
+    driver: bridge
+
+
