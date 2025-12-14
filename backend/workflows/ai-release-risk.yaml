@@ -1,0 +1,83 @@
+id: ai-release-risk
+namespace: devplus
+
+inputs:
+  - name: repository_id
+    type: STRING
+  - name: repo_owner
+    type: STRING
+  - name: repo_name
+    type: STRING
+  - name: pr_data
+    type: STRING
+  - name: callback_url
+    type: STRING
+
+tasks:
+  - id: analyze_release_risk
+    type: io.kestra.plugin.ai.agent.AIAgent
+    prompt: |
+      You are a senior release engineer and risk analyst. Analyze the following pull requests for a release:
+
+      Repository: {{ trigger.body.repo_owner }}/{{ trigger.body.repo_name }}
+
+      Pull Requests included in this release:
+      {{ trigger.body.pr_data }}
+
+      Based on the pull requests included in this release, provide:
+
+      1. **CHANGELOG**: Generate a well-formatted changelog in markdown with:
+         - Features (new functionality)
+         - Improvements (enhancements to existing features)
+         - Bug Fixes
+         - Breaking Changes (if any)
+         - Dependencies Updates (if any)
+         Group by PR and use proper markdown formatting with headers and bullet points.
+
+      2. **RISK ASSESSMENT**: Analyze the release risk based on:
+         - Complexity of changes (lines changed, files affected)
+         - Number of breaking changes
+         - Database migrations or schema changes
+         - API changes that affect backwards compatibility
+         - Security-sensitive code changes
+         - Performance-critical modifications
+         - Dependencies updates (especially major version bumps)
+         - Test coverage and quality of PRs
+         - Size of the release (number of PRs)
+
+      3. **RISK SCORE**: Provide a risk score from 0-100 where:
+         - 0-30: LOW risk - Minor changes, well-tested, no breaking changes
+         - 31-60: MEDIUM risk - Moderate changes, some complexity, good test coverage
+         - 61-85: HIGH risk - Significant changes, breaking changes, or major refactoring
+         - 86-100: CRITICAL risk - Large-scale changes, multiple breaking changes, or high complexity
+
+      **IMPORTANT**: Provide your response as a valid JSON object with this exact structure:
+      {
+        "changelog": "Full markdown formatted changelog with headers and bullet points",
+        "risk_score": 50,
+        "summary": "Brief 2-3 sentence executive summary of the release and its risk level"
+      }
+
+      Ensure the JSON is valid and properly escaped. Do not include any text outside the JSON object.
+    provider:
+      type: io.kestra.plugin.ai.provider.GoogleGemini
+      modelName: gemini-2.0-flash-exp
+      apiKey: "{{ secret('GEMINI_API_KEY') }}"
+    tools:
+      - type: io.kestra.plugin.ai.tool.KestraFlow
+
+  - id: callback_backend
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ trigger.body.callback_url }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "repository_id": "{{ trigger.body.repository_id }}",
+        "raw_analysis": {{ outputs.analyze_release_risk.textOutput | json }}
+      }
+
+triggers:
+  - id: webhook
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: devplus-release-risk-key
