@@ -49,7 +49,7 @@ func (c *AuthController) Callback(w http.ResponseWriter, r *http.Request) {
 		Value:    session.ID,
 		Expires:  session.ExpiresAt,
 		HttpOnly: true,
-		Secure:   false, // Set to true in production (checking TLS)
+		Secure:   true, // Set to true in production (checking TLS)
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
 	})
