@@ -12,14 +12,16 @@ const axiosInstance: AxiosInstance = axios.create({
   timeout: 30000, // 30s timeout
 });
 
-// Request interceptor (optional: for logging or attaching headers if needed later)
+// Request interceptor - Add Authorization header with token
 axiosInstance.interceptors.request.use(
   (config) => {
-    // You can attach tokens here if you were using Bearer tokens instead of cookies
-    // const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    // Get token from localStorage and add to Authorization header
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('session_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => {
@@ -34,8 +36,11 @@ axiosInstance.interceptors.response.use(
     if (error.response) {
       // Server responded with non-2xx code
       if (error.response.status === 401) {
-        // Handle Unauthorized (e.g., redirect to login)
-        // window.location.href = '/login'; // Careful with server-side rendering
+        // Clear token and redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('session_token');
+          window.location.href = '/login';
+        }
         console.warn('Unauthorized access. Session might have expired.');
       }
     }

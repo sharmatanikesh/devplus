@@ -12,13 +12,22 @@ import (
 // SessionMiddleware validates the session_token cookie
 func SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_token")
-		if err != nil {
-			http.Error(w, "Unauthorized: No session cookie", http.StatusUnauthorized)
+		// Get token from Authorization header (format: "Bearer <token>")
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Unauthorized: No authorization header", http.StatusUnauthorized)
 			return
 		}
 
-		sessionID := cookie.Value
+		// Extract token
+		var sessionID string
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			sessionID = authHeader[7:]
+		} else {
+			http.Error(w, "Unauthorized: Invalid authorization format", http.StatusUnauthorized)
+			return
+		}
+
 		dbInstance := db.GetInstance()
 
 		var session models.Session
