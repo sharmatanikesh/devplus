@@ -35,7 +35,7 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/server .
 
-# Copy workflows directory (for Kestra)
+# Copy workflows directory (for reference)
 COPY --from=builder /app/workflows ./workflows
 
 # Expose port
