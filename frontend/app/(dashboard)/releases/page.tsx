@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Package, AlertTriangle, CheckCircle2, Rocket, TrendingUp, RefreshCw, GitPullRequest } from 'lucide-react';
 import { Repository, PullRequest } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
@@ -355,7 +354,7 @@ export default function ReleasesPage() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No release summary available for this repository yet. Click "New Release" to generate one.
+                  No release summary available for this repository yet. Click &quot;New Release&quot; to generate one.
                 </p>
               );
             })()}

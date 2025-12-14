@@ -163,12 +163,12 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 			
 			// Update the PR in database
 			prModel := &models.PullRequest{
-				GithubPRID: pr.ID,
+				GithubPRID: github.Int64(pr.GetID()),
 				Number:     github.Int64(int64(pr.GetNumber())),
 				Title:      github.String(pr.GetTitle()),
 				State:      github.String(state),
 				RepoID:     &repo.ID,
-				AuthorID:   pr.GetUser().ID,
+				AuthorID:   github.Int64(pr.GetUser().GetID()),
 				AuthorName: github.String(pr.GetUser().GetLogin()),
 				CreatedAt:  &pr.CreatedAt.Time,
 				UpdatedAt:  &pr.UpdatedAt.Time,
@@ -184,12 +184,12 @@ func (s *GithubService) SyncPullRequests(ctx context.Context, repoID string, tok
 	for _, pr := range openPRsFromGitHub {
 		log.Info().Int("pr_number", pr.GetNumber()).Str("title", pr.GetTitle()).Msg("[Service.SyncPullRequests] Processing open PR")
 		prModel := &models.PullRequest{
-			GithubPRID: pr.ID,
+			GithubPRID: github.Int64(pr.GetID()),
 			Number:     github.Int64(int64(pr.GetNumber())),
 			Title:      github.String(pr.GetTitle()),
 			State:      github.String(pr.GetState()),
 			RepoID:     &repo.ID,
-			AuthorID:   pr.GetUser().ID,
+			AuthorID:   github.Int64(pr.GetUser().GetID()),
 			AuthorName: github.String(pr.GetUser().GetLogin()),
 			CreatedAt:  &pr.CreatedAt.Time,
 			UpdatedAt:  &pr.UpdatedAt.Time,
