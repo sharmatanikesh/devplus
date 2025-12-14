@@ -292,3 +292,52 @@ func (s *KestraAIService) fetchPRDiff(ctx context.Context, owner, repo string, p
 	
 	return buf.String(), nil
 }
+
+// TriggerReleaseRiskAnalysis triggers the Kestra workflow for release risk analysis
+func (s *KestraAIService) TriggerReleaseRiskAnalysis(repoID, owner, name, prData, callbackURL string) error {
+	log.Info().Str("repo_id", repoID).Str("flow_id", "ai-release-risk").Msg("[KestraService] Triggering release risk analysis")
+
+	// Construct inputs for Kestra Flow
+	inputs := map[string]interface{}{
+		"repository_id": repoID,
+		"repo_owner":    owner,
+		"repo_name":     name,
+		"pr_data":       prData,
+		"callback_url":  callbackURL,
+	}
+
+	// Use Webhook endpoint
+	url := fmt.Sprintf("%s/api/v1/executions/webhook/devplus/ai-release-risk/devplus-release-risk-key", s.kestraURL)
+
+	jsonBody, err := json.Marshal(inputs)
+	if err != nil {
+		log.Error().Err(err).Msg("[KestraService] Failed to marshal request body")
+		return err
+	}
+
+	log.Debug().Str("url", url).RawJSON("body", jsonBody).Msg("[KestraService] Sending webhook request to Kestra")
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.username != "" && s.password != "" {
+		req.SetBasicAuth(s.username, s.password)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Error().Err(err).Str("url", url).Msg("[KestraService] Failed to send request")
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Error().Int("status", resp.StatusCode).Str("url", url).Msg("[KestraService] Kestra returned error status")
+		return fmt.Errorf("kestra returned status %d", resp.StatusCode)
+	}
+
+	log.Info().Str("repo_id", repoID).Msg("[KestraService] Successfully triggered release risk analysis")
+	return nil
+}

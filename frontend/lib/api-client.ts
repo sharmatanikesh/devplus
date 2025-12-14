@@ -130,6 +130,9 @@ class ApiClient {
     analyze: (id: string) => this.post<{ status: string }>(API_ENDPOINTS.REPOS_ANALYZE(id)),
     get: (id: string) => this.get(API_ENDPOINTS.REPOS_DETAIL(id)),
     getPullRequests: (owner: string, repo: string) => this.get(`/v1/repos/${owner}/${repo}/pulls`),
+    getPullRequestsByRepoId: (id: string) => this.get<any[]>(`/v1/repos/${id}/pulls`),
+    syncPullRequests: (id: string) => this.post<any[]>(`/v1/repos/${id}/sync`),
+    calculateReleaseRisk: (id: string, prIds: string[]) => this.post<{ status: string; message: string }>(`/v1/repos/${id}/calculate-release-risk`, { pr_ids: prIds }),
   };
 
   // Pull Requests

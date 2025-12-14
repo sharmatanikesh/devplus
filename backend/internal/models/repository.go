@@ -17,6 +17,10 @@ type Repository struct {
 	UserID         string     `gorm:"column:user_id;type:uuid;not null" json:"user_id"`
 	User           *User      `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"user,omitempty"`
 	AISummary      string     `gorm:"column:ai_summary;type:text" json:"ai_summary"`
+	// Release risk fields
+	ReleaseRiskScore    int    `gorm:"column:release_risk_score;default:0" json:"release_risk_score"`
+	ReleaseChangelog    string `gorm:"column:release_changelog;type:text" json:"release_changelog"`
+	ReleaseRiskAnalysis string `gorm:"column:release_risk_analysis;type:text" json:"release_risk_analysis"`
 }
 
 func (Repository) TableName() string {

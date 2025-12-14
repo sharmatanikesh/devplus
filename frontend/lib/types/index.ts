@@ -33,6 +33,9 @@ export interface Repository {
   lastSyncedAt?: string;
   webhookConfigured: boolean;
   ai_summary?: string;  // Backend sends ai_summary (snake_case)
+  release_risk_score?: number;
+  release_changelog?: string;
+  release_risk_analysis?: string;
   createdAt: string;
   updatedAt: string;
 }

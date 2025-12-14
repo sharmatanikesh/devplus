@@ -24,6 +24,7 @@ type GithubRepository interface {
 	UpsertPullRequest(ctx context.Context, pr *models.PullRequest) error
 	UpdatePullRequestAnalysis(ctx context.Context, prID string, summary, decision string) error
 	UpdateRepositoryAnalysis(ctx context.Context, repoID string, summary string) error
+	UpdateReleaseRiskAnalysis(ctx context.Context, repoID string, riskScore int, changelog string, rawAnalysis string) error
 }
 
 type gormGithubRepository struct {
@@ -227,4 +228,14 @@ func (r *gormGithubRepository) UpdateRepositoryAnalysis(ctx context.Context, rep
 	return r.db.WithContext(ctx).Model(&models.Repository{}).
 		Where("id = ?", repoID).
 		Update("ai_summary", summary).Error
+}
+
+func (r *gormGithubRepository) UpdateReleaseRiskAnalysis(ctx context.Context, repoID string, riskScore int, changelog string, rawAnalysis string) error {
+	return r.db.WithContext(ctx).Model(&models.Repository{}).
+		Where("id = ?", repoID).
+		Updates(map[string]interface{}{
+			"release_risk_score":    riskScore,
+			"release_changelog":     changelog,
+			"release_risk_analysis": rawAnalysis,
+		}).Error
 }

@@ -559,3 +559,26 @@ func splitRepoName(fullName string) []string {
 	}
 	return parts
 }
+
+// TriggerReleaseRiskAnalysis triggers the Kestra workflow for release risk analysis
+func (s *GithubService) TriggerReleaseRiskAnalysis(ctx context.Context, repoID string, owner string, name string, prData string) error {
+	aiService, err := s.aiFactory.GetAIService("kestra")
+	if err != nil {
+		return err
+	}
+
+	// Construct callback URL
+	callbackURL := fmt.Sprintf("%s/api/v1/webhook/release-risk", s.backendURL)
+
+	return aiService.TriggerReleaseRiskAnalysis(repoID, owner, name, prData, callbackURL)
+}
+
+// UpdateReleaseRiskAnalysis updates the repository with release risk analysis results
+func (s *GithubService) UpdateReleaseRiskAnalysis(ctx context.Context, repoID string, riskScore int, changelog string, rawAnalysis string) error {
+	return s.repo.UpdateReleaseRiskAnalysis(ctx, repoID, riskScore, changelog, rawAnalysis)
+}
+
+// GetPullRequestsByRepoID retrieves all pull requests for a repository
+func (s *GithubService) GetPullRequestsByRepoID(ctx context.Context, repoID string) ([]*models.PullRequest, error) {
+	return s.repo.GetPullRequestsByRepoID(ctx, repoID)
+}

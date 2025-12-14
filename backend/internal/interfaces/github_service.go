@@ -23,4 +23,7 @@ type GithubService interface {
 	AnalyzeRepository(ctx context.Context, repoID string) error
 	UpdateRepositoryAnalysis(ctx context.Context, repoID string, summary string) error
 	AnalyzePullRequest(ctx context.Context, repoID string, prNumber int) error
+	TriggerReleaseRiskAnalysis(ctx context.Context, repoID string, owner string, name string, prData string) error
+	UpdateReleaseRiskAnalysis(ctx context.Context, repoID string, riskScore int, changelog string, rawAnalysis string) error
+	GetPullRequestsByRepoID(ctx context.Context, repoID string) ([]*models.PullRequest, error)
 }
