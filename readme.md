@@ -1,10 +1,10 @@
-# DevPlus 🚀
+# DevPulse 🚀
 
 ![CodeRabbit Reviews](https://img.shields.io/coderabbit/prs/github/sharmatanikesh/devplus?utm_source=oss&utm_medium=github&utm_campaign=sharmatanikesh%2Fdevplus&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-000000?style=flat&logo=vercel&logoColor=white)
 ![Kestra](https://img.shields.io/badge/Powered%20by-Kestra-4A90E2?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMiAxMkwxMiAyMkwyMiAxMkwxMiAyWiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+)
 
-**DevPlus** is an AI-powered engineering intelligence platform that provides automated PR reviews, intelligent release notes generation, and comprehensive engineering metrics. Gain actionable insights into your development workflow and improve team productivity with data-driven decisions.
+**DevPulse** is an AI-powered engineering intelligence platform that provides automated PR reviews, intelligent release notes generation, and comprehensive engineering metrics. Gain actionable insights into your development workflow and improve team productivity with data-driven decisions.
 
 ## ✨ Key Features
 
@@ -18,7 +18,7 @@
 
 ## 🏗️ Architecture
 
-DevPlus is built with a modern, scalable architecture:
+DevPulse is built with a modern, scalable architecture:
 
 ### Frontend
 
