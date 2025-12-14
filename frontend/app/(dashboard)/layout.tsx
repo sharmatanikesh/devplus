@@ -20,15 +20,15 @@ import {
   GitPullRequest,
   BarChart3,
   Package,
-  Settings,
   LogOut,
-  Menu,
-  X,
   Zap,
+  Heart,
+  Github,
 } from 'lucide-react';
 import { NAVIGATION_ITEMS } from '@/lib/constants';
 import { apiClient } from '@/lib/api-client';
 import { User } from '@/lib/types';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const iconMap = {
   LayoutDashboard,
@@ -45,8 +45,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
@@ -57,10 +57,15 @@ export default function DashboardLayout({
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
-        // Optionally redirect to login if 401, but apiClient interceptor might handle it
       }
     }
     fetchUser();
+
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleLogout = async () => {
@@ -73,44 +78,35 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg">DevPulse</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-        </div>
+    <div className="min-h-screen bg-background relative flex flex-col">
+      {/* Background Gradients */}
+      <div className="fixed inset-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-sky-500/5 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/5 blur-[120px]" />
       </div>
 
-      {/* Sidebar */}
-      <aside
+      {/* Top Navigation Bar */}
+      <header
         className={cn(
-          'fixed top-0 left-0 z-40 h-screen w-64 bg-background border-r transition-transform lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-200 border-b border-transparent",
+          scrolled ? "bg-background/80 backdrop-blur-md border-border/50 shadow-sm" : "bg-transparent"
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="w-full max-w-[2000px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2 p-6 border-b">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg">DevPulse</span>
-          </div>
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="h-8 w-8 bg-sky-500 rounded-lg flex items-center justify-center shadow-lg shadow-sky-500/20"
+            >
+              <Zap className="h-5 w-5 text-white" />
+            </motion.div>
+            <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/80">DevPulse</span>
+          </Link>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="hidden md:flex items-center gap-1">
             {NAVIGATION_ITEMS.map((item) => {
               const Icon = iconMap[item.icon as keyof typeof iconMap];
               const isActive = pathname === item.href;
@@ -119,74 +115,109 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setSidebarOpen(false)}
+                  className="relative group"
                 >
                   <div
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
+                      'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-muted'
+                        ? 'text-sky-600 dark:text-sky-400'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     )}
                   >
-                    <Icon className="h-5 w-5" />
-                    <span className="font-medium">{item.title}</span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute inset-0 bg-sky-100 dark:bg-sky-900/20 rounded-full"
+                        initial={false}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                    <Icon className={cn("h-4 w-4 relative z-10 transition-colors", isActive ? "text-sky-600 dark:text-sky-400" : "group-hover:text-sky-500")} />
+                    <span className="relative z-10">{item.title}</span>
                   </div>
                 </Link>
               );
             })}
           </nav>
 
-          {/* User menu */}
-          <div className="p-4 border-t">
+          {/* User Menu */}
+          <div className="flex items-center gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start px-3 h-auto py-2"
-                >
-                  <Avatar className="h-8 w-8 mr-3">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-transparent hover:ring-sky-200 transition-all p-0 overflow-hidden">
+                  <Avatar className="h-9 w-9 cursor-pointer">
                     <AvatarImage src={user?.avatarUrl || "https://github.com/github.png"} />
-                    <AvatarFallback>{user?.username?.substring(0, 2).toUpperCase() || "DV"}</AvatarFallback>
+                    <AvatarFallback className="bg-sky-100 text-sky-700">{user?.username?.substring(0, 2).toUpperCase() || "DV"}</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col items-start text-left overflow-hidden">
-                    <span className="text-sm font-medium truncate w-full">{user?.username || "Loading..."}</span>
-                    <span className="text-xs text-muted-foreground truncate w-full">
-                      {user?.email || "..."}
-                    </span>
-                  </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.username}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/20 cursor-pointer"
+                  onClick={handleLogout}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
-      </aside>
+      </header>
 
       {/* Main content */}
-      <main className="lg:ml-64 pt-16 lg:pt-0">
-        <div className="p-6">{children}</div>
+      <main className="flex-1 pt-16">
+        <div className="w-full max-w-[2000px] mx-auto p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </main>
 
-      {/* Overlay for mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <footer className="py-6 border-t border-border/50 bg-background/50 backdrop-blur-sm">
+        <div className="w-full max-w-[2000px] mx-auto px-6 md:px-8 grid gap-4 md:grid-cols-3 items-center">
+          {/* Empty left column for balance */}
+          <div className="hidden md:block" />
+
+          {/* Center Content */}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
+            <span className="font-bold text-sky-500 animate-pulse">DevPulse</span>
+            <span className="hidden md:inline">•</span>
+            <p className="flex items-center gap-1">
+              Made with <Heart className="h-3 w-3 text-red-500 fill-red-500 animate-pulse" /> from team ShaiTan
+            </p>
+          </div>
+
+          {/* Right Content */}
+          <div className="flex justify-center md:justify-end">
+            <a
+              href="https://github.com/sharmatanikesh/devplus"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-sky-600 transition-colors"
+            >
+              <Github className="h-4 w-4 cursor-pointer hover:scale-110 transition-transform" />
+              See code
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

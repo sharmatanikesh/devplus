@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+
 import { useEffect } from 'react';
 import { useRepositories } from '@/hooks/use-repositories';
 import { RepositoryList } from '@/components/repositories/repository-list';
@@ -29,7 +31,7 @@ export default function RepositoriesPage() {
   const { repositories, isLoading, error, refetch } = useRepositories();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+
   const dispatch = useAppDispatch();
   const { selectedRepoIds, isInitialized } = useAppSelector(
     (state) => state.repositoryVisibility
@@ -54,7 +56,7 @@ export default function RepositoriesPage() {
     }
   };
 
-  const filteredRepositories = repositories.filter(repo => 
+  const filteredRepositories = repositories.filter(repo =>
     selectedRepoIds.includes(repo.id)
   );
 
@@ -65,7 +67,6 @@ export default function RepositoriesPage() {
         await apiClient.repos.syncAll();
       } else {
         // Fallback if type definition hasn't reloaded in IDE yet, though runtime should be fine
-        // casting to any to avoid TS error during transition
         await (apiClient.repos as any).sync();
       }
       await refetch();
@@ -88,10 +89,14 @@ export default function RepositoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Repositories</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">Repositories</h1>
           <p className="text-muted-foreground">
             Manage your synced repositories and configurations
           </p>
@@ -99,46 +104,53 @@ export default function RepositoriesPage() {
         <div className="flex gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="border-sky-100 hover:bg-sky-50 hover:text-sky-600 dark:border-sky-900/50 dark:hover:bg-sky-900/20">
                 <ListFilter className="mr-2 h-4 w-4" />
                 Edit List
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-md max-h-[80vh] flex flex-col bg-card/90 backdrop-blur-xl border-sky-100 dark:border-sky-900/50 sm:rounded-2xl shadow-2xl">
               <DialogHeader>
-                <DialogTitle>Edit Repository List</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-sky-600 to-indigo-600 dark:from-sky-400 dark:to-indigo-400">Edit Repository List</DialogTitle>
+                <DialogDescription className="text-muted-foreground/80">
                   Select which repositories to display on your dashboard.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                <div className="flex items-center space-x-2 py-2 border-b">
+              <div className="flex-1 overflow-y-auto space-y-4 pr-2 -mr-2 my-2 custom-scrollbar">
+                <div className="flex items-center space-x-3 py-3 px-3 rounded-lg bg-sky-50/50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-900/30">
                   <Checkbox
                     id="select-all"
                     checked={selectedRepoIds.length === repositories.length && repositories.length > 0}
                     onCheckedChange={handleToggleSelectAll}
+                    className="data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
                   />
-                  <Label htmlFor="select-all" className="font-semibold cursor-pointer">
+                  <Label htmlFor="select-all" className="font-semibold cursor-pointer text-sky-900 dark:text-sky-100 flex-1">
                     Select All ({selectedRepoIds.length}/{repositories.length})
                   </Label>
                 </div>
-                {repositories.map((repo) => (
-                  <div key={repo.id} className="flex items-center space-x-2 py-2">
-                    <Checkbox
-                      id={repo.id}
-                      checked={selectedRepoIds.includes(repo.id)}
-                      onCheckedChange={() => handleToggleRepo(repo.id)}
-                    />
-                    <Label htmlFor={repo.id} className="flex-1 cursor-pointer">
-                      <div className="font-medium">{repo.name}</div>
-                      <div className="text-xs text-muted-foreground">{repo.owner}</div>
-                    </Label>
-                  </div>
-                ))}
+                <div className="space-y-1">
+                  {repositories.map((repo) => (
+                    <div
+                      key={repo.id}
+                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group border border-transparent hover:border-border/50"
+                    >
+                      <Checkbox
+                        id={repo.id}
+                        checked={selectedRepoIds.includes(repo.id)}
+                        onCheckedChange={() => handleToggleRepo(repo.id)}
+                        className="data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
+                      />
+                      <Label htmlFor={repo.id} className="flex-1 cursor-pointer">
+                        <div className="font-medium group-hover:text-sky-600 transition-colors">{repo.name}</div>
+                        <div className="text-xs text-muted-foreground">{repo.owner}</div>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
-          <Button disabled={isLoading || isSyncing} onClick={handleSync}>
+          <Button disabled={isLoading || isSyncing} onClick={handleSync} className="bg-sky-500 hover:bg-sky-600 text-white shadow-lg shadow-sky-500/20">
             {isSyncing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -152,16 +164,17 @@ export default function RepositoriesPage() {
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-[180px] rounded-xl border bg-card text-card-foreground shadow-sm p-6 space-y-4">
-              <div className="h-6 w-1/2 bg-muted animate-pulse rounded" />
-              <div className="h-4 w-1/3 bg-muted animate-pulse rounded" />
-              <div className="mt-auto pt-4 h-8 w-full bg-muted animate-pulse rounded" />
+            <div key={i} className="h-[180px] rounded-xl border border-sky-100 dark:border-sky-900/50 bg-card/50 p-6 space-y-4 relative overflow-hidden">
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-sky-500/5 to-transparent animate-shimmer" style={{ transform: 'translateX(-100%)' }} />
+              <div className="h-6 w-1/2 bg-muted/50 rounded animate-pulse" />
+              <div className="h-4 w-1/3 bg-muted/50 rounded animate-pulse" />
+              <div className="mt-auto pt-4 h-8 w-full bg-muted/50 rounded animate-pulse" />
             </div>
           ))}
         </div>
       ) : (
         <RepositoryList repositories={filteredRepositories} />
       )}
-    </div>
+    </motion.div>
   );
 }
